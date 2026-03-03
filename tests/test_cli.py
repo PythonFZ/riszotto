@@ -178,6 +178,97 @@ class TestShow:
         assert result.exit_code == 0
         mock_md.convert.assert_called_once_with("/path/to/paper2.pdf")
 
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_page_default_paginates(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        # 10 lines of content, page_size=5
+        mock_result.markdown = "\n".join(f"Line {i}" for i in range(1, 11))
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--page-size", "5", "PARENT1"])
+        assert result.exit_code == 0
+        assert "Line 1" in result.output
+        assert "Line 5" in result.output
+        assert "Line 6" not in result.output
+        assert "Page 1/2" in result.output
+
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_page_2(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = "\n".join(f"Line {i}" for i in range(1, 11))
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--page", "2", "--page-size", "5", "PARENT1"])
+        assert result.exit_code == 0
+        assert "Line 6" in result.output
+        assert "Line 10" in result.output
+        assert "Line 5" not in result.output
+
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_page_zero_dumps_all(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = "\n".join(f"Line {i}" for i in range(1, 11))
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--page", "0", "--page-size", "5", "PARENT1"])
+        assert result.exit_code == 0
+        assert "Line 1" in result.output
+        assert "Line 10" in result.output
+
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_page_out_of_range(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = "Short doc"
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--page", "99", "--page-size", "5", "PARENT1"])
+        assert result.exit_code == 1
+        assert "out of range" in result.output.lower()
+
 
 class TestInfoMaxValueSize:
     @patch("riszotto.cli.get_client")

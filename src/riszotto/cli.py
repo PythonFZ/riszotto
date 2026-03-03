@@ -117,8 +117,15 @@ def info(
 def show(
     key: Annotated[str, typer.Argument(help="Zotero item key")],
     attachment: Annotated[int, typer.Option("--attachment", "-a", help="PDF attachment index (1-indexed)")] = 1,
+    page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed, 0 = show all)")] = 1,
+    page_size: Annotated[int, typer.Option("--page-size", help="Lines per page")] = 500,
+    search: Annotated[Optional[str], typer.Option("--search", "-s", help="Show only sections matching this term")] = None,
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
+    if search is not None and page != 1:
+        typer.echo("--search and --page cannot be used together.", err=True)
+        raise typer.Exit(1)
+
     try:
         zot = get_client()
     except (ConnectionError, Exception) as e:
@@ -139,13 +146,46 @@ def show(
     selected = pdfs[attachment - 1]
     file_path = get_pdf_path(selected)
     if not file_path:
-        typer.echo(f"Could not determine local file path for attachment.", err=True)
+        typer.echo("Could not determine local file path for attachment.", err=True)
         raise typer.Exit(1)
 
     try:
         md = MarkItDown()
         result = md.convert(file_path)
-        typer.echo(result.markdown)
+        markdown = result.markdown
     except Exception as e:
         typer.echo(f"Failed to convert PDF to markdown: {e}", err=True)
         raise typer.Exit(1)
+
+    if search is not None:
+        _show_search(markdown, search)
+        return
+
+    _show_paginated(markdown, page, page_size, key)
+
+
+def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
+    """Print a page of markdown lines."""
+    lines = markdown.splitlines()
+    total_lines = len(lines)
+
+    if page == 0:
+        typer.echo(markdown)
+        return
+
+    total_pages = max(1, -(-total_lines // page_size))  # ceil division
+    if page > total_pages:
+        typer.echo(f"Page {page} out of range. Document has {total_pages} page(s).", err=True)
+        raise typer.Exit(1)
+
+    start = (page - 1) * page_size
+    end = start + page_size
+    typer.echo("\n".join(lines[start:end]))
+
+    if total_pages > 1:
+        typer.echo(f"\nPage {page}/{total_pages}. Next: riszotto show --page {page + 1} {key}")
+
+
+def _show_search(markdown: str, term: str) -> None:
+    """Print markdown sections matching a search term."""
+    pass  # implemented in Task 5
