@@ -72,7 +72,21 @@ def info(
     key: Annotated[str, typer.Argument(help="Zotero item key")],
 ) -> None:
     """Show JSON metadata for a paper."""
-    typer.echo("info: not implemented")
+    try:
+        zot = get_client()
+    except (ConnectionError, Exception) as e:
+        if "connection" in str(e).lower() or "refused" in str(e).lower():
+            typer.echo("Zotero desktop is not running. Start Zotero and ensure the local API is enabled.", err=True)
+            raise typer.Exit(1)
+        raise
+
+    try:
+        item = get_item(zot, key)
+    except Exception:
+        typer.echo(f"Item '{key}' not found in your library.", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(json.dumps(item.get("data", {}), indent=2))
 
 
 @app.command()

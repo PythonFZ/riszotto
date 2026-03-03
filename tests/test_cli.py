@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -64,3 +65,32 @@ class TestSearch:
         result = runner.invoke(app, ["search", "test"])
         assert result.exit_code == 1
         assert "Zotero desktop is not running" in result.output
+
+
+class TestInfo:
+    @patch("riszotto.cli.get_client")
+    def test_info_outputs_json(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.item.return_value = {
+            "data": {
+                "key": "ABC12345",
+                "title": "Test Paper",
+                "DOI": "10.1234/test",
+                "itemType": "journalArticle",
+            }
+        }
+        result = runner.invoke(app, ["info", "ABC12345"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["title"] == "Test Paper"
+        assert parsed["DOI"] == "10.1234/test"
+
+    @patch("riszotto.cli.get_client")
+    def test_info_invalid_key(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.item.side_effect = Exception("Item not found")
+        result = runner.invoke(app, ["info", "BADKEY"])
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
