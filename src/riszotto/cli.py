@@ -40,12 +40,14 @@ def search(
     terms: Annotated[list[str], typer.Argument(help="Search terms")],
     full_text: Annotated[bool, typer.Option("--full-text", help="Search all fields including full-text")] = False,
     limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 25,
+    page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed)")] = 1,
 ) -> None:
     """Search for papers in your Zotero library."""
     query = " ".join(terms)
+    start = (page - 1) * limit
     try:
         zot = get_client()
-        results = search_items(zot, query, full_text=full_text, limit=limit)
+        results = search_items(zot, query, full_text=full_text, limit=limit, start=start)
     except (ConnectionError, Exception) as e:
         if "connection" in str(e).lower() or "refused" in str(e).lower():
             typer.echo("Zotero desktop is not running. Start Zotero and ensure the local API is enabled.", err=True)
@@ -66,6 +68,11 @@ def search(
         if len(title) > 60:
             title = title[:59] + "…"
         typer.echo(f"{key:<11}{year:<6}{author:<20}{title}")
+
+    # Footer
+    first = start + 1
+    last = start + len(results)
+    typer.echo(f"\nPage {page} (results {first}-{last}). Next: riszotto search --page {page + 1} \"{query}\"")
 
 
 @app.command()

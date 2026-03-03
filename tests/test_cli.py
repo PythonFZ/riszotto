@@ -49,7 +49,7 @@ class TestSearch:
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = []
         runner.invoke(app, ["search", "--full-text", "deep learning"])
-        mock_zot.items.assert_called_once_with(q="deep learning", qmode="everything", limit=25)
+        mock_zot.items.assert_called_once_with(q="deep learning", qmode="everything", limit=25, start=0)
 
     @patch("riszotto.cli.get_client")
     def test_search_limit_flag(self, mock_get_client):
@@ -57,7 +57,7 @@ class TestSearch:
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = []
         runner.invoke(app, ["search", "--limit", "5", "test"])
-        mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=5)
+        mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=5, start=0)
 
     @patch("riszotto.cli.get_client")
     def test_search_zotero_not_running(self, mock_get_client):
@@ -65,6 +65,29 @@ class TestSearch:
         result = runner.invoke(app, ["search", "test"])
         assert result.exit_code == 1
         assert "Zotero desktop is not running" in result.output
+
+    @patch("riszotto.cli.get_client")
+    def test_search_page_flag(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = []
+        runner.invoke(app, ["search", "--page", "3", "test"])
+        mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=25, start=50)
+
+    @patch("riszotto.cli.get_client")
+    def test_search_page_footer(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = [
+            {
+                "data": {"key": "ABC12345", "title": "Paper", "date": "2024", "creators": []},
+                "meta": {},
+            }
+        ]
+        result = runner.invoke(app, ["search", "test"])
+        assert result.exit_code == 0
+        assert "Page 1" in result.output
+        assert "--page 2" in result.output
 
 
 class TestInfo:
