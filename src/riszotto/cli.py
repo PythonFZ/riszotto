@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Annotated, Optional
 
 import typer
@@ -120,7 +119,8 @@ def show(
     attachment: Annotated[int, typer.Option("--attachment", "-a", help="PDF attachment index (1-indexed)")] = 1,
     page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed, 0 = show all)")] = 1,
     page_size: Annotated[int, typer.Option("--page-size", help="Lines per page")] = 500,
-    search: Annotated[Optional[str], typer.Option("--search", "-s", help="Show only sections matching this term")] = None,
+    search: Annotated[Optional[str], typer.Option("--search", "-s", help="Show only lines matching all terms")] = None,
+    context: Annotated[int, typer.Option("--context", "-C", help="Context lines around each search match")] = 3,
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
     try:
@@ -155,10 +155,12 @@ def show(
         raise typer.Exit(1)
 
     if search is not None:
-        markdown = _filter_sections(markdown, search.split())
-        if markdown is None:
-            typer.echo(f"No sections matching '{search}' found.")
+        output = _grep_lines(markdown, search.split(), context)
+        if output is None:
+            typer.echo(f"No lines matching '{search}' found.")
             return
+        typer.echo(output)
+        return
 
     _show_paginated(markdown, page, page_size, key)
 
@@ -185,23 +187,30 @@ def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
         typer.echo(f"\nPage {page}/{total_pages}. Next: riszotto show --page {page + 1} {key}")
 
 
-def _filter_sections(markdown: str, terms: list[str]) -> str | None:
-    """Return markdown sections matching all search terms, or None if no match."""
-    sections: list[str] = []
-    current: list[str] = []
-
-    for line in markdown.splitlines():
-        if re.match(r"^#{1,6}\s", line) and current:
-            sections.append("\n".join(current))
-            current = []
-        current.append(line)
-    if current:
-        sections.append("\n".join(current))
-
+def _grep_lines(markdown: str, terms: list[str], context: int = 3) -> str | None:
+    """Return lines matching all search terms with surrounding context, grep-style."""
+    lines = markdown.splitlines()
     terms_lower = [t.lower() for t in terms]
-    matches = [s for s in sections if all(t in s.lower() for t in terms_lower)]
+    match_indices = {
+        i for i, line in enumerate(lines) if all(t in line.lower() for t in terms_lower)
+    }
 
-    if not matches:
+    if not match_indices:
         return None
 
-    return "\n\n".join(matches)
+    # Expand to include context lines
+    visible: set[int] = set()
+    for i in match_indices:
+        for j in range(max(0, i - context), min(len(lines), i + context + 1)):
+            visible.add(j)
+
+    # Build output with "--" separators between non-contiguous blocks
+    output: list[str] = []
+    prev = -2
+    for i in sorted(visible):
+        if i > prev + 1 and output:
+            output.append("--")
+        output.append(lines[i])
+        prev = i
+
+    return "\n".join(output)

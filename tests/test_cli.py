@@ -283,7 +283,7 @@ class TestShow:
 
     @patch("riszotto.cli.MarkItDown")
     @patch("riszotto.cli.get_client")
-    def test_show_search_finds_sections(self, mock_get_client, mock_markitdown_cls):
+    def test_show_search_finds_lines(self, mock_get_client, mock_markitdown_cls):
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -295,20 +295,19 @@ class TestShow:
         mock_md = MagicMock()
         mock_markitdown_cls.return_value = mock_md
         mock_result = MagicMock()
-        mock_result.markdown = (
-            "# Introduction\n\nThis paper studies regression.\n\n"
-            "## Methods\n\nWe used a neural network.\n\n"
-            "## Results\n\nRegression analysis showed improvement.\n\n"
-            "## Conclusion\n\nFuture work needed."
-        )
+        # 20 filler lines, then a match, then 20 more filler lines
+        lines = [f"filler line {i}" for i in range(20)]
+        lines.append("This paper studies regression.")
+        lines.extend(f"filler line {i}" for i in range(20, 40))
+        mock_result.markdown = "\n".join(lines)
         mock_md.convert.return_value = mock_result
 
-        result = runner.invoke(app, ["show", "--search", "regression", "PARENT1"])
+        result = runner.invoke(app, ["show", "--search", "regression", "-C", "1", "PARENT1"])
         assert result.exit_code == 0
-        assert "# Introduction" in result.output
-        assert "## Results" in result.output
-        assert "## Methods" not in result.output
-        assert "## Conclusion" not in result.output
+        assert "This paper studies regression." in result.output
+        assert "filler line 19" in result.output  # 1 line before
+        assert "filler line 20" in result.output  # 1 line after
+        assert "filler line 0" not in result.output  # far away
 
     @patch("riszotto.cli.MarkItDown")
     @patch("riszotto.cli.get_client")
@@ -329,7 +328,7 @@ class TestShow:
 
         result = runner.invoke(app, ["show", "--search", "nonexistent", "PARENT1"])
         assert result.exit_code == 0
-        assert "No sections matching" in result.output
+        assert "No lines matching" in result.output
 
     @patch("riszotto.cli.MarkItDown")
     @patch("riszotto.cli.get_client")
@@ -345,22 +344,24 @@ class TestShow:
         mock_md = MagicMock()
         mock_markitdown_cls.return_value = mock_md
         mock_result = MagicMock()
+        # 20 filler lines between each content line to avoid context overlap
+        filler_a = "\n".join(f"padding {i}" for i in range(20))
         mock_result.markdown = (
-            "# Introduction\n\nDFT and BMIM were studied.\n\n"
-            "## Methods\n\nWe used DFT calculations.\n\n"
-            "## Results\n\nBMIM showed interesting properties.\n\n"
-            "## Discussion\n\nDFT confirms BMIM stability."
+            f"DFT and BMIM were studied.\n{filler_a}\n"
+            f"We used DFT calculations.\n{filler_a}\n"
+            f"BMIM showed interesting properties.\n{filler_a}\n"
+            f"DFT confirms BMIM stability."
         )
         mock_md.convert.return_value = mock_result
 
-        result = runner.invoke(app, ["show", "--search", "DFT BMIM", "PARENT1"])
+        result = runner.invoke(app, ["show", "--search", "DFT BMIM", "-C", "0", "PARENT1"])
         assert result.exit_code == 0
-        # Only sections containing BOTH terms should match
-        assert "# Introduction" in result.output
-        assert "## Discussion" in result.output
-        # Sections with only one term should not match
-        assert "## Methods" not in result.output
-        assert "## Results" not in result.output
+        # Lines containing BOTH terms match
+        assert "DFT and BMIM were studied." in result.output
+        assert "DFT confirms BMIM stability." in result.output
+        # Lines with only one term do not
+        assert "We used DFT calculations." not in result.output
+        assert "BMIM showed interesting properties." not in result.output
 
     @patch("riszotto.cli.MarkItDown")
     @patch("riszotto.cli.get_client")
@@ -376,13 +377,36 @@ class TestShow:
         mock_md = MagicMock()
         mock_markitdown_cls.return_value = mock_md
         mock_result = MagicMock()
-        mock_result.markdown = "# Introduction\n\nMachine Learning is great.\n\n## Methods\n\nOther stuff."
+        mock_result.markdown = "Machine Learning is great."
         mock_md.convert.return_value = mock_result
 
         result = runner.invoke(app, ["show", "--search", "MACHINE LEARNING", "PARENT1"])
         assert result.exit_code == 0
-        assert "# Introduction" in result.output
-        assert "## Methods" not in result.output
+        assert "Machine Learning is great." in result.output
+
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_search_separator_between_blocks(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        lines = [f"filler {i}" for i in range(20)]
+        lines[3] = "match alpha here"
+        lines[15] = "match alpha there"
+        mock_result.markdown = "\n".join(lines)
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--search", "alpha", "-C", "1", "PARENT1"])
+        assert result.exit_code == 0
+        assert "\n--\n" in result.output
 
 
 class TestInfoMaxValueSize:
