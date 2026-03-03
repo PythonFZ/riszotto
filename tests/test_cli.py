@@ -94,3 +94,63 @@ class TestInfo:
         result = runner.invoke(app, ["info", "BADKEY"])
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
+
+
+class TestShow:
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_converts_pdf(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///Users/me/Zotero/storage/ATT1/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = "# Paper Title\n\nSome content here."
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "PARENT1"])
+        assert result.exit_code == 0
+        assert "# Paper Title" in result.output
+        mock_md.convert.assert_called_once_with("/Users/me/Zotero/storage/ATT1/paper.pdf")
+
+    @patch("riszotto.cli.get_client")
+    def test_show_no_pdf_attachment(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {"data": {"key": "NOTE1", "itemType": "note"}, "links": {}},
+        ]
+        result = runner.invoke(app, ["show", "PARENT1"])
+        assert result.exit_code == 1
+        assert "No PDF attachment" in result.output
+
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_attachment_flag(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper1.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper1.pdf"}},
+            },
+            {
+                "data": {"key": "ATT2", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper2.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper2.pdf"}},
+            },
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = "Second PDF content"
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--attachment", "2", "PARENT1"])
+        assert result.exit_code == 0
+        mock_md.convert.assert_called_once_with("/path/to/paper2.pdf")

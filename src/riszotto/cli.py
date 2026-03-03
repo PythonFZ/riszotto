@@ -7,6 +7,7 @@ import sys
 from typing import Annotated, Optional
 
 import typer
+from markitdown import MarkItDown
 
 from riszotto.client import get_client, get_item, get_pdf_attachments, get_pdf_path, search_items
 
@@ -92,6 +93,36 @@ def info(
 @app.command()
 def show(
     key: Annotated[str, typer.Argument(help="Zotero item key")],
+    attachment: Annotated[int, typer.Option("--attachment", "-a", help="PDF attachment index (1-indexed)")] = 1,
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
-    typer.echo("show: not implemented")
+    try:
+        zot = get_client()
+    except (ConnectionError, Exception) as e:
+        if "connection" in str(e).lower() or "refused" in str(e).lower():
+            typer.echo("Zotero desktop is not running. Start Zotero and ensure the local API is enabled.", err=True)
+            raise typer.Exit(1)
+        raise
+
+    pdfs = get_pdf_attachments(zot, key)
+    if not pdfs:
+        typer.echo(f"No PDF attachment found for item {key}.", err=True)
+        raise typer.Exit(1)
+
+    if attachment < 1 or attachment > len(pdfs):
+        typer.echo(f"Attachment index {attachment} out of range. Item has {len(pdfs)} PDF(s).", err=True)
+        raise typer.Exit(1)
+
+    selected = pdfs[attachment - 1]
+    file_path = get_pdf_path(selected)
+    if not file_path:
+        typer.echo(f"Could not determine local file path for attachment.", err=True)
+        raise typer.Exit(1)
+
+    try:
+        md = MarkItDown()
+        result = md.convert(file_path)
+        typer.echo(result.markdown)
+    except Exception as e:
+        typer.echo(f"Failed to convert PDF to markdown: {e}", err=True)
+        raise typer.Exit(1)
