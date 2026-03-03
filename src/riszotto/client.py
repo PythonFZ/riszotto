@@ -24,10 +24,11 @@ def search_items(
     *,
     full_text: bool = False,
     limit: int = 25,
+    start: int = 0,
 ) -> list[dict[str, Any]]:
     """Search the Zotero library."""
     qmode = "everything" if full_text else "titleCreatorYear"
-    return zot.items(q=query, qmode=qmode, limit=limit)
+    return zot.items(q=query, qmode=qmode, limit=limit, start=start)
 
 
 def get_item(zot: zotero.Zotero, key: str) -> dict[str, Any]:
