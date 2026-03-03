@@ -18,6 +18,9 @@ def get_client() -> zotero.Zotero:
     )
 
 
+_CHILD_ITEM_TYPES = {"attachment", "note", "annotation"}
+
+
 def search_items(
     zot: zotero.Zotero,
     query: str,
@@ -26,9 +29,29 @@ def search_items(
     limit: int = 25,
     start: int = 0,
 ) -> list[dict[str, Any]]:
-    """Search the Zotero library."""
+    """Search the Zotero library, resolving child items to their parents."""
     qmode = "everything" if full_text else "titleCreatorYear"
-    return zot.items(q=query, qmode=qmode, limit=limit, start=start)
+    raw = zot.items(q=query, qmode=qmode, limit=limit, start=start)
+
+    results: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+
+    for item in raw:
+        data = item.get("data", {})
+        if data.get("itemType") in _CHILD_ITEM_TYPES:
+            parent_key = data.get("parentItem")
+            if not parent_key or parent_key in seen_keys:
+                continue
+            seen_keys.add(parent_key)
+            results.append(zot.item(parent_key))
+        else:
+            key = data.get("key", "")
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            results.append(item)
+
+    return results
 
 
 def get_item(zot: zotero.Zotero, key: str) -> dict[str, Any]:

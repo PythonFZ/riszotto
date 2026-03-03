@@ -52,6 +52,39 @@ class TestSearchItems:
         search_items(mock_zot, "test", full_text=False, limit=25)
         mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=25, start=0)
 
+    def test_search_resolves_attachments_to_parents(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = [
+            {"data": {"key": "ATT1", "itemType": "attachment", "parentItem": "PAPER1"}},
+            {"data": {"key": "PAPER2", "itemType": "journalArticle", "title": "Direct Hit"}},
+            {"data": {"key": "ATT2", "itemType": "attachment", "parentItem": "PAPER1"}},
+            {"data": {"key": "NOTE1", "itemType": "note", "parentItem": "PAPER3"}},
+        ]
+        mock_zot.item.side_effect = lambda key: {
+            "PAPER1": {"data": {"key": "PAPER1", "itemType": "journalArticle", "title": "Resolved Paper"}},
+            "PAPER3": {"data": {"key": "PAPER3", "itemType": "journalArticle", "title": "From Note"}},
+        }[key]
+
+        results = search_items(mock_zot, "test", full_text=True, limit=25)
+        keys = [r["data"]["key"] for r in results]
+        assert keys == ["PAPER1", "PAPER2", "PAPER3"]
+        # PAPER1 fetched only once despite two attachments
+        mock_zot.item.assert_any_call("PAPER1")
+        mock_zot.item.assert_any_call("PAPER3")
+        assert mock_zot.item.call_count == 2
+
+    def test_search_keeps_parent_items_as_is(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = [
+            {"data": {"key": "P1", "itemType": "journalArticle", "title": "Paper 1"}},
+            {"data": {"key": "P2", "itemType": "conferencePaper", "title": "Paper 2"}},
+        ]
+        results = search_items(mock_zot, "test", full_text=False, limit=25)
+        assert len(results) == 2
+        assert results[0]["data"]["key"] == "P1"
+        assert results[1]["data"]["key"] == "P2"
+        mock_zot.item.assert_not_called()
+
 
 class TestGetItem:
     def test_returns_item(self):
