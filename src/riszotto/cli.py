@@ -35,6 +35,19 @@ def _format_year(item: dict) -> str:
     return date[:4] if len(date) >= 4 else ""
 
 
+def _filter_long_values(data: dict, max_size: int) -> dict:
+    """Replace string values longer than max_size with a placeholder."""
+    if max_size <= 0:
+        return data
+    filtered = {}
+    for k, v in data.items():
+        if isinstance(v, str) and len(v) > max_size:
+            filtered[k] = f"<hidden ({len(v)} chars)>"
+        else:
+            filtered[k] = v
+    return filtered
+
+
 @app.command()
 def search(
     terms: Annotated[list[str], typer.Argument(help="Search terms")],
@@ -78,6 +91,7 @@ def search(
 @app.command()
 def info(
     key: Annotated[str, typer.Argument(help="Zotero item key")],
+    max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
 ) -> None:
     """Show JSON metadata for a paper."""
     try:
@@ -94,7 +108,9 @@ def info(
         typer.echo(f"Item '{key}' not found in your library.", err=True)
         raise typer.Exit(1)
 
-    typer.echo(json.dumps(item.get("data", {}), indent=2))
+    data = item.get("data", {})
+    data = _filter_long_values(data, max_value_size)
+    typer.echo(json.dumps(data, indent=2))
 
 
 @app.command()
