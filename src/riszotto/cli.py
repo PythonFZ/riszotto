@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from typing import Annotated, Optional
 
 import typer
