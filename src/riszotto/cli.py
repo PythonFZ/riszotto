@@ -82,10 +82,11 @@ def search(
             title = title[:59] + "…"
         typer.echo(f"{key:<11}{year:<6}{author:<20}{title}")
 
-    # Footer
-    first = start + 1
-    last = start + len(results)
-    typer.echo(f"\nPage {page} (results {first}-{last}). Next: riszotto search --page {page + 1} \"{query}\"")
+    # Footer (only if results fill the page, suggesting more exist)
+    if len(results) >= limit:
+        first = start + 1
+        last = start + len(results)
+        typer.echo(f"\nPage {page} (results {first}-{last}). Next: riszotto search --page {page + 1} \"{query}\"")
 
 
 @app.command()

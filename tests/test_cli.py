@@ -75,7 +75,7 @@ class TestSearch:
         mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=25, start=50)
 
     @patch("riszotto.cli.get_client")
-    def test_search_page_footer(self, mock_get_client):
+    def test_search_no_footer_when_single_page(self, mock_get_client):
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = [
@@ -83,6 +83,18 @@ class TestSearch:
                 "data": {"key": "ABC12345", "title": "Paper", "date": "2024", "creators": []},
                 "meta": {},
             }
+        ]
+        result = runner.invoke(app, ["search", "test"])
+        assert result.exit_code == 0
+        assert "--page 2" not in result.output
+
+    @patch("riszotto.cli.get_client")
+    def test_search_footer_when_full_page(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = [
+            {"data": {"key": f"K{i:07d}", "title": f"Paper {i}", "date": "2024", "creators": []}, "meta": {}}
+            for i in range(25)
         ]
         result = runner.invoke(app, ["search", "test"])
         assert result.exit_code == 0
