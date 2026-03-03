@@ -269,6 +269,78 @@ class TestShow:
         assert result.exit_code == 1
         assert "out of range" in result.output.lower()
 
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_search_finds_sections(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = (
+            "# Introduction\n\nThis paper studies regression.\n\n"
+            "## Methods\n\nWe used a neural network.\n\n"
+            "## Results\n\nRegression analysis showed improvement.\n\n"
+            "## Conclusion\n\nFuture work needed."
+        )
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--search", "regression", "PARENT1"])
+        assert result.exit_code == 0
+        assert "# Introduction" in result.output
+        assert "## Results" in result.output
+        assert "## Methods" not in result.output
+        assert "## Conclusion" not in result.output
+
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_search_no_match(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = "# Introduction\n\nSome content.\n\n## Methods\n\nMore content."
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--search", "nonexistent", "PARENT1"])
+        assert result.exit_code == 0
+        assert "No sections matching" in result.output
+
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
+    def test_show_search_case_insensitive(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = "# Introduction\n\nMachine Learning is great.\n\n## Methods\n\nOther stuff."
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--search", "MACHINE LEARNING", "PARENT1"])
+        assert result.exit_code == 0
+        assert "# Introduction" in result.output
+        assert "## Methods" not in result.output
+
 
 class TestInfoMaxValueSize:
     @patch("riszotto.cli.get_client")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from typing import Annotated, Optional
 
@@ -188,4 +189,22 @@ def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
 
 def _show_search(markdown: str, term: str) -> None:
     """Print markdown sections matching a search term."""
-    pass  # implemented in Task 5
+    sections: list[str] = []
+    current: list[str] = []
+
+    for line in markdown.splitlines():
+        if re.match(r"^#{1,6}\s", line) and current:
+            sections.append("\n".join(current))
+            current = []
+        current.append(line)
+    if current:
+        sections.append("\n".join(current))
+
+    term_lower = term.lower()
+    matches = [s for s in sections if term_lower in s.lower()]
+
+    if not matches:
+        typer.echo(f"No sections matching '{term}' found.")
+        return
+
+    typer.echo("\n\n".join(matches))
