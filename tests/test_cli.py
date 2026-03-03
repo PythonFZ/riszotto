@@ -333,6 +333,37 @@ class TestShow:
 
     @patch("riszotto.cli.MarkItDown")
     @patch("riszotto.cli.get_client")
+    def test_show_search_multiple_terms(self, mock_get_client, mock_markitdown_cls):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = (
+            "# Introduction\n\nDFT and BMIM were studied.\n\n"
+            "## Methods\n\nWe used DFT calculations.\n\n"
+            "## Results\n\nBMIM showed interesting properties.\n\n"
+            "## Discussion\n\nDFT confirms BMIM stability."
+        )
+        mock_md.convert.return_value = mock_result
+
+        result = runner.invoke(app, ["show", "--search", "DFT BMIM", "PARENT1"])
+        assert result.exit_code == 0
+        # Only sections containing BOTH terms should match
+        assert "# Introduction" in result.output
+        assert "## Discussion" in result.output
+        # Sections with only one term should not match
+        assert "## Methods" not in result.output
+        assert "## Results" not in result.output
+
+    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_client")
     def test_show_search_case_insensitive(self, mock_get_client, mock_markitdown_cls):
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot

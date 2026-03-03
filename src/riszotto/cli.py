@@ -123,10 +123,6 @@ def show(
     search: Annotated[Optional[str], typer.Option("--search", "-s", help="Show only sections matching this term")] = None,
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
-    if search is not None and page != 1:
-        typer.echo("--search and --page cannot be used together.", err=True)
-        raise typer.Exit(1)
-
     try:
         zot = get_client()
     except (ConnectionError, Exception) as e:
@@ -159,8 +155,10 @@ def show(
         raise typer.Exit(1)
 
     if search is not None:
-        _show_search(markdown, search)
-        return
+        markdown = _filter_sections(markdown, search.split())
+        if markdown is None:
+            typer.echo(f"No sections matching '{search}' found.")
+            return
 
     _show_paginated(markdown, page, page_size, key)
 
@@ -187,8 +185,8 @@ def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
         typer.echo(f"\nPage {page}/{total_pages}. Next: riszotto show --page {page + 1} {key}")
 
 
-def _show_search(markdown: str, term: str) -> None:
-    """Print markdown sections matching a search term."""
+def _filter_sections(markdown: str, terms: list[str]) -> str | None:
+    """Return markdown sections matching all search terms, or None if no match."""
     sections: list[str] = []
     current: list[str] = []
 
@@ -200,11 +198,10 @@ def _show_search(markdown: str, term: str) -> None:
     if current:
         sections.append("\n".join(current))
 
-    term_lower = term.lower()
-    matches = [s for s in sections if term_lower in s.lower()]
+    terms_lower = [t.lower() for t in terms]
+    matches = [s for s in sections if all(t in s.lower() for t in terms_lower)]
 
     if not matches:
-        typer.echo(f"No sections matching '{term}' found.")
-        return
+        return None
 
-    typer.echo("\n\n".join(matches))
+    return "\n\n".join(matches)
