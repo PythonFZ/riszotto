@@ -7,6 +7,8 @@ from urllib.parse import unquote, urlparse
 
 from pyzotero import zotero
 
+from riszotto.formatting import CHILD_ITEM_TYPES
+
 
 def get_client() -> zotero.Zotero:
     """Create a pyzotero client connected to the local Zotero instance."""
@@ -16,9 +18,6 @@ def get_client() -> zotero.Zotero:
         api_key=None,
         local=True,
     )
-
-
-_CHILD_ITEM_TYPES = {"attachment", "note", "annotation"}
 
 
 def search_items(
@@ -54,7 +53,7 @@ def search_items(
 
     for item in raw:
         data = item.get("data", {})
-        if data.get("itemType") in _CHILD_ITEM_TYPES:
+        if data.get("itemType") in CHILD_ITEM_TYPES:
             parent_key = data.get("parentItem")
             if not parent_key or parent_key in seen_keys:
                 continue

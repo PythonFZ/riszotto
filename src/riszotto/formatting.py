@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+CHILD_ITEM_TYPES = {"attachment", "note", "annotation"}
+
 
 def format_creator(creator: dict) -> str:
     """Format a single Zotero creator dict as a string."""

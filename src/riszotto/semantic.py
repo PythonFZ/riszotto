@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from riszotto.formatting import format_creator
+from riszotto.formatting import CHILD_ITEM_TYPES, format_creator
 
 INDEX_DIR = Path.home() / ".riszotto" / "chroma_db"
 BATCH_SIZE = 500
-
-_CHILD_ITEM_TYPES = {"attachment", "note", "annotation"}
 
 
 def _build_document_text(item: dict) -> str:
@@ -67,7 +65,7 @@ def _get_collection(*, rebuild: bool = False):
     return client.get_or_create_collection(name="zotero")
 
 
-def build_index(zot, *, rebuild: bool = False, limit=None) -> dict[str, int]:
+def build_index(zot, *, rebuild: bool = False, limit: int | None = None) -> dict[str, int]:
     """Build or update the semantic search index.
 
     Fetches items from Zotero and upserts their text into ChromaDB.
@@ -81,12 +79,12 @@ def build_index(zot, *, rebuild: bool = False, limit=None) -> dict[str, int]:
     # Filter out child items
     top_level = [
         item for item in items
-        if item.get("data", {}).get("itemType", "").lower() not in _CHILD_ITEM_TYPES
+        if item.get("data", {}).get("itemType", "").lower() not in CHILD_ITEM_TYPES
     ]
 
     # In incremental mode, skip already-indexed items
     if not rebuild and collection.count() > 0:
-        existing_ids = set(collection.get()["ids"])
+        existing_ids = set(collection.get(include=[])["ids"])
     else:
         existing_ids = set()
 
@@ -133,6 +131,10 @@ def semantic_search(query: str, *, limit: int = 10) -> list[dict]:
     Converts ChromaDB distances to similarity scores (1 - distance).
     """
     collection = _get_collection()
+
+    if collection.count() == 0:
+        return []
+
     results = collection.query(query_texts=[query], n_results=limit)
 
     ids = results.get("ids", [[]])[0]

@@ -38,7 +38,7 @@ class TestBuildDocumentText:
     def test_empty_item(self):
         item = {"data": {}}
         text = _build_document_text(item)
-        assert isinstance(text, str)
+        assert text == ""
 
     def test_institution_creator(self):
         item = {
@@ -241,6 +241,7 @@ class TestSemanticSearch:
     def test_returns_results_with_scores(self, mock_get_col):
         mock_collection = MagicMock()
         mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 2
         mock_collection.query.return_value = {
             "ids": [["KEY1", "KEY2"]],
             "distances": [[0.2, 0.5]],
@@ -265,6 +266,7 @@ class TestSemanticSearch:
     def test_empty_results(self, mock_get_col):
         mock_collection = MagicMock()
         mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 1
         mock_collection.query.return_value = {
             "ids": [[]],
             "distances": [[]],
@@ -273,6 +275,16 @@ class TestSemanticSearch:
 
         results = semantic_search("nonexistent topic")
         assert results == []
+
+    @patch("riszotto.semantic._get_collection")
+    def test_empty_index_returns_early(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 0
+
+        results = semantic_search("anything")
+        assert results == []
+        mock_collection.query.assert_not_called()
 
 
 class TestGetIndexStatus:
