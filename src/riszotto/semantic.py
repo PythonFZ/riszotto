@@ -125,3 +125,29 @@ def build_index(zot, *, rebuild: bool = False, limit=None) -> dict[str, int]:
         )
 
     return {"indexed": len(ids_to_upsert), "skipped": skipped}
+
+
+def semantic_search(query: str, *, limit: int = 10) -> list[dict]:
+    """Query the semantic index and return ranked results.
+
+    Converts ChromaDB distances to similarity scores (1 - distance).
+    """
+    collection = _get_collection()
+    results = collection.query(query_texts=[query], n_results=limit)
+
+    ids = results.get("ids", [[]])[0]
+    distances = results.get("distances", [[]])[0]
+    metadatas = results.get("metadatas", [[]])[0]
+
+    output: list[dict] = []
+    for i, key in enumerate(ids):
+        score = round(1 - distances[i], 4)
+        meta = metadatas[i] if i < len(metadatas) else {}
+        output.append({
+            "key": key,
+            "title": meta.get("title", ""),
+            "itemType": meta.get("itemType", ""),
+            "score": score,
+        })
+
+    return output

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from riszotto.semantic import (
     _build_document_text,
     build_index,
+    semantic_search,
 )
 
 
@@ -231,3 +232,42 @@ class TestBuildIndex:
 
         build_index(mock_zot, limit=100)
         mock_zot.items.assert_called_once_with(limit=100, itemType="-attachment")
+
+
+class TestSemanticSearch:
+    @patch("riszotto.semantic._get_collection")
+    def test_returns_results_with_scores(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.query.return_value = {
+            "ids": [["KEY1", "KEY2"]],
+            "distances": [[0.2, 0.5]],
+            "metadatas": [
+                [
+                    {"title": "Paper One", "itemType": "journalArticle"},
+                    {"title": "Paper Two", "itemType": "book"},
+                ]
+            ],
+        }
+
+        results = semantic_search("deep learning")
+        assert len(results) == 2
+        assert results[0]["key"] == "KEY1"
+        assert results[0]["title"] == "Paper One"
+        assert results[0]["itemType"] == "journalArticle"
+        assert results[0]["score"] == 0.8
+        assert results[1]["key"] == "KEY2"
+        assert results[1]["score"] == 0.5
+
+    @patch("riszotto.semantic._get_collection")
+    def test_empty_results(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.query.return_value = {
+            "ids": [[]],
+            "distances": [[]],
+            "metadatas": [[]],
+        }
+
+        results = semantic_search("nonexistent topic")
+        assert results == []
