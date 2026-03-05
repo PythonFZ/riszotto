@@ -600,3 +600,54 @@ class TestRecent:
         assert "Zotero desktop is not running" in result.output
 
 
+class TestIndex:
+    @patch("riszotto.cli.get_client")
+    @patch("riszotto.cli._import_semantic")
+    def test_index_builds(self, mock_import_semantic, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.build_index.return_value = {"indexed": 10, "skipped": 2}
+
+        result = runner.invoke(app, ["index"])
+        assert result.exit_code == 0
+        assert "10" in result.output
+        mock_semantic.build_index.assert_called_once_with(mock_zot, rebuild=False, limit=None)
+
+    @patch("riszotto.cli.get_client")
+    @patch("riszotto.cli._import_semantic")
+    def test_index_rebuild(self, mock_import_semantic, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.build_index.return_value = {"indexed": 5, "skipped": 0}
+
+        result = runner.invoke(app, ["index", "--rebuild"])
+        assert result.exit_code == 0
+        mock_semantic.build_index.assert_called_once_with(mock_zot, rebuild=True, limit=None)
+
+    @patch("riszotto.cli.get_client")
+    @patch("riszotto.cli._import_semantic")
+    def test_index_status(self, mock_import_semantic, mock_get_client):
+        mock_get_client.return_value = MagicMock()
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.get_index_status.return_value = {"count": 42, "path": "/home/user/.riszotto/chroma_db"}
+
+        result = runner.invoke(app, ["index", "--status"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["count"] == 42
+        assert parsed["path"] == "/home/user/.riszotto/chroma_db"
+
+    @patch("riszotto.cli._import_semantic")
+    def test_index_missing_extras(self, mock_import_semantic):
+        mock_import_semantic.return_value = None
+
+        result = runner.invoke(app, ["index"])
+        assert result.exit_code == 1
+        assert "semantic" in result.output.lower()
+
+

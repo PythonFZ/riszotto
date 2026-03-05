@@ -23,6 +23,15 @@ from riszotto.formatting import format_creator
 app = typer.Typer(add_completion=False)
 
 
+def _import_semantic():
+    """Import semantic module, returning None if extras not installed."""
+    try:
+        from riszotto import semantic
+        return semantic
+    except ImportError:
+        return None
+
+
 def _get_zot() -> zotero.Zotero:
     """Get Zotero client, raising typer.Exit on connection failure."""
     try:
@@ -243,3 +252,28 @@ def recent(
         "results": [_format_result(item, max_value_size) for item in items],
     }
     typer.echo(json.dumps(envelope, indent=2))
+
+
+@app.command()
+def index(
+    rebuild: Annotated[bool, typer.Option("--rebuild", help="Drop and rebuild the entire index")] = False,
+    status: Annotated[bool, typer.Option("--status", help="Show index statistics")] = False,
+    limit: Annotated[Optional[int], typer.Option("--limit", "-l", help="Maximum items to fetch from Zotero")] = None,
+) -> None:
+    """Build or update the semantic search index."""
+    semantic = _import_semantic()
+    if semantic is None:
+        typer.echo(
+            "Semantic search extras not installed. Run: uv pip install riszotto[semantic]",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if status:
+        info = semantic.get_index_status()
+        typer.echo(json.dumps(info, indent=2))
+        return
+
+    zot = _get_zot()
+    stats = semantic.build_index(zot, rebuild=rebuild, limit=limit)
+    typer.echo(f"Indexed {stats['indexed']} items ({stats['skipped']} skipped).")
