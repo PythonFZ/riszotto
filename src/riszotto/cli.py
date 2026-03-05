@@ -7,11 +7,25 @@ from typing import Annotated, Optional
 
 import typer
 from markitdown import MarkItDown
+from pyzotero import zotero
 
 from riszotto.client import get_client, get_pdf_attachments, get_pdf_path, search_items
 
 app = typer.Typer(add_completion=False)
 
+
+def _get_zot() -> zotero.Zotero:
+    """Get Zotero client, raising typer.Exit on connection failure."""
+    try:
+        return get_client()
+    except (ConnectionError, Exception) as e:
+        if "connection" in str(e).lower() or "refused" in str(e).lower():
+            typer.echo(
+                "Zotero desktop is not running. Start Zotero and ensure the local API is enabled.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        raise
 
 
 def _filter_long_values(data: dict, max_size: int) -> dict:
@@ -62,14 +76,8 @@ def search(
     """Search for papers in your Zotero library."""
     query = " ".join(terms)
     start = (page - 1) * limit
-    try:
-        zot = get_client()
-        results = search_items(zot, query, full_text=full_text, limit=limit, start=start)
-    except (ConnectionError, Exception) as e:
-        if "connection" in str(e).lower() or "refused" in str(e).lower():
-            typer.echo("Zotero desktop is not running. Start Zotero and ensure the local API is enabled.", err=True)
-            raise typer.Exit(1)
-        raise
+    zot = _get_zot()
+    results = search_items(zot, query, full_text=full_text, limit=limit, start=start)
 
     envelope = {
         "page": page,
@@ -91,13 +99,7 @@ def show(
     context: Annotated[int, typer.Option("--context", "-C", help="Context lines around each search match")] = 3,
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
-    try:
-        zot = get_client()
-    except (ConnectionError, Exception) as e:
-        if "connection" in str(e).lower() or "refused" in str(e).lower():
-            typer.echo("Zotero desktop is not running. Start Zotero and ensure the local API is enabled.", err=True)
-            raise typer.Exit(1)
-        raise
+    zot = _get_zot()
 
     pdfs = get_pdf_attachments(zot, key)
     if not pdfs:
@@ -182,3 +184,12 @@ def _grep_lines(markdown: str, terms: list[str], context: int = 3) -> str | None
         prev = i
 
     return "\n".join(output)
+
+
+@app.command()
+def collections(
+    key: Annotated[Optional[str], typer.Argument(help="Collection key (omit to list all)")] = None,
+) -> None:
+    """List collections or items in a collection."""
+    zot = _get_zot()
+    typer.echo(json.dumps({"results": []}, indent=2))

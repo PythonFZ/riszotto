@@ -171,6 +171,15 @@ class TestSearch:
         assert parsed["results"][0]["authors"] == ["WHO"]
 
 
+class TestConnectionError:
+    @patch("riszotto.cli.get_client")
+    def test_collections_zotero_not_running(self, mock_get_client):
+        mock_get_client.side_effect = ConnectionError("connection refused")
+        result = runner.invoke(app, ["collections"])
+        assert result.exit_code == 1
+        assert "Zotero desktop is not running" in result.output
+
+
 class TestShow:
     @patch("riszotto.cli.MarkItDown")
     @patch("riszotto.cli.get_client")
