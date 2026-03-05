@@ -208,6 +208,76 @@ class TestSearch:
         assert kwargs["direction"] == "asc"
 
 
+class TestSearchSemantic:
+    @patch("riszotto.cli.get_client")
+    @patch("riszotto.cli._import_semantic")
+    def test_semantic_search_outputs_envelope(self, mock_import_semantic, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.semantic_search.return_value = [
+            {"key": "P1", "title": "Paper One", "itemType": "journalArticle", "score": 0.95},
+            {"key": "P2", "title": "Paper Two", "itemType": "book", "score": 0.80},
+        ]
+        mock_zot.item.side_effect = lambda key: {
+            "P1": {
+                "data": {
+                    "key": "P1", "title": "Paper One", "itemType": "journalArticle",
+                    "date": "2024", "abstractNote": "Abstract 1.", "creators": [], "tags": [],
+                },
+            },
+            "P2": {
+                "data": {
+                    "key": "P2", "title": "Paper Two", "itemType": "book",
+                    "date": "2023", "abstractNote": "Abstract 2.", "creators": [], "tags": [],
+                },
+            },
+        }[key]
+
+        result = runner.invoke(app, ["search", "--semantic", "attention mechanisms"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["results"]) == 2
+        assert parsed["results"][0]["key"] == "P1"
+        assert parsed["results"][0]["score"] == 0.95
+        assert parsed["results"][0]["title"] == "Paper One"
+        assert parsed["results"][1]["key"] == "P2"
+        assert parsed["results"][1]["score"] == 0.80
+
+    @patch("riszotto.cli.get_client")
+    @patch("riszotto.cli._import_semantic")
+    def test_semantic_search_no_results(self, mock_import_semantic, mock_get_client):
+        mock_get_client.return_value = MagicMock()
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.semantic_search.return_value = []
+
+        result = runner.invoke(app, ["search", "--semantic", "nonexistent"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["results"] == []
+
+    @patch("riszotto.cli._import_semantic")
+    def test_semantic_search_missing_extras(self, mock_import_semantic):
+        mock_import_semantic.return_value = None
+
+        result = runner.invoke(app, ["search", "--semantic", "test"])
+        assert result.exit_code == 1
+        assert "semantic" in result.output.lower()
+
+    @patch("riszotto.cli.get_client")
+    @patch("riszotto.cli._import_semantic")
+    def test_semantic_search_respects_limit(self, mock_import_semantic, mock_get_client):
+        mock_get_client.return_value = MagicMock()
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.semantic_search.return_value = []
+
+        runner.invoke(app, ["search", "--semantic", "--limit", "5", "test"])
+        mock_semantic.semantic_search.assert_called_once_with("test", limit=5)
+
+
 class TestConnectionError:
     @patch("riszotto.cli.get_client")
     def test_collections_zotero_not_running(self, mock_get_client):

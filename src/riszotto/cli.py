@@ -78,6 +78,7 @@ def _format_result(item: dict, max_value_size: int) -> dict:
 def search(
     terms: Annotated[list[str], typer.Argument(help="Search terms")],
     full_text: Annotated[bool, typer.Option("--full-text/--no-full-text", help="Search all fields including full-text")] = False,
+    semantic: Annotated[bool, typer.Option("--semantic", help="Use semantic similarity search")] = False,
     limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 25,
     page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed)")] = 1,
     max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
@@ -89,6 +90,34 @@ def search(
 ) -> None:
     """Search for papers in your Zotero library."""
     query = " ".join(terms)
+
+    if semantic:
+        sem = _import_semantic()
+        if sem is None:
+            typer.echo(
+                "Semantic search extras not installed. Run: uv pip install riszotto[semantic]",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        zot = _get_zot()
+        hits = sem.semantic_search(query, limit=limit)
+        results = []
+        for hit in hits:
+            item = zot.item(hit["key"])
+            formatted = _format_result(item, max_value_size)
+            formatted["score"] = hit["score"]
+            results.append(formatted)
+
+        envelope = {
+            "page": 1,
+            "limit": limit,
+            "start": 0,
+            "results": results,
+        }
+        typer.echo(json.dumps(envelope, indent=2))
+        return
+
     start = (page - 1) * limit
     zot = _get_zot()
     results = search_items(
