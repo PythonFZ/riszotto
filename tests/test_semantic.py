@@ -3,7 +3,9 @@ from unittest.mock import MagicMock, patch
 from riszotto.semantic import (
     _build_document_text,
     build_index,
+    get_index_status,
     semantic_search,
+    INDEX_DIR,
 )
 
 
@@ -271,3 +273,25 @@ class TestSemanticSearch:
 
         results = semantic_search("nonexistent topic")
         assert results == []
+
+
+class TestGetIndexStatus:
+    @patch("riszotto.semantic._get_collection")
+    def test_returns_count_and_path(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 42
+
+        status = get_index_status()
+        assert status["count"] == 42
+        assert status["path"] == str(INDEX_DIR)
+
+    @patch("riszotto.semantic._get_collection")
+    def test_empty_index(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 0
+
+        status = get_index_status()
+        assert status["count"] == 0
+        assert status["path"] == str(INDEX_DIR)

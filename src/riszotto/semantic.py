@@ -151,3 +151,12 @@ def semantic_search(query: str, *, limit: int = 10) -> list[dict]:
         })
 
     return output
+
+
+def get_index_status() -> dict:
+    """Return the current state of the semantic index."""
+    collection = _get_collection()
+    return {
+        "count": collection.count(),
+        "path": str(INDEX_DIR),
+    }
