@@ -47,12 +47,37 @@ def _filter_long_values(data: dict, max_size: int) -> dict:
     return filtered
 
 
+def _format_creator(creator: dict) -> str:
+    """Format a single Zotero creator dict as a string."""
+    last = creator.get("lastName", "")
+    first = creator.get("firstName", "")
+    if last and first:
+        return f"{last}, {first}"
+    return creator.get("name", last or first)
+
+
+def _format_result(item: dict, max_value_size: int) -> dict:
+    """Extract display fields from a Zotero item."""
+    data = item.get("data", {})
+    result = {
+        "key": data.get("key", ""),
+        "title": data.get("title", ""),
+        "itemType": data.get("itemType", ""),
+        "date": data.get("date", ""),
+        "authors": [_format_creator(c) for c in data.get("creators", [])],
+        "abstract": data.get("abstractNote", ""),
+        "tags": [t["tag"] for t in data.get("tags", [])],
+    }
+    return _filter_long_values(result, max_value_size)
+
+
 @app.command()
 def search(
     terms: Annotated[list[str], typer.Argument(help="Search terms")],
     full_text: Annotated[bool, typer.Option("--full-text/--no-full-text", help="Search all fields including full-text")] = False,
     limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 25,
     page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed)")] = 1,
+    max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
 ) -> None:
     """Search for papers in your Zotero library."""
     query = " ".join(terms)
@@ -66,26 +91,13 @@ def search(
             raise typer.Exit(1)
         raise
 
-    # Print compact table
-    typer.echo(f"{'KEY':<11}{'YEAR':<6}{'AUTHOR':<20}{'TITLE'}")
-    for item in results:
-        data = item.get("data", {})
-        key = data.get("key", "")
-        year = _format_year(item)
-        author = _format_author(item)
-        title = data.get("title", "")
-        # Truncate long values
-        if len(author) > 18:
-            author = author[:17] + "…"
-        if len(title) > 60:
-            title = title[:59] + "…"
-        typer.echo(f"{key:<11}{year:<6}{author:<20}{title}")
-
-    # Footer (only if results fill the page, suggesting more exist)
-    if len(results) >= limit:
-        first = start + 1
-        last = start + len(results)
-        typer.echo(f"\nPage {page} (results {first}-{last}). Next: riszotto search --page {page + 1} \"{query}\"")
+    envelope = {
+        "page": page,
+        "limit": limit,
+        "start": start,
+        "results": [_format_result(item, max_value_size) for item in results],
+    }
+    typer.echo(json.dumps(envelope, indent=2))
 
 
 @app.command()

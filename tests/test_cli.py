@@ -10,7 +10,7 @@ runner = CliRunner()
 
 class TestSearch:
     @patch("riszotto.cli.get_client")
-    def test_search_shows_table(self, mock_get_client):
+    def test_search_outputs_json_envelope(self, mock_get_client):
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = [
@@ -18,21 +18,33 @@ class TestSearch:
                 "data": {
                     "key": "ABC12345",
                     "title": "Attention Is All You Need",
+                    "itemType": "journalArticle",
                     "date": "2017-06-12",
+                    "abstractNote": "We propose a new architecture.",
                     "creators": [
                         {"firstName": "Ashish", "lastName": "Vaswani", "creatorType": "author"},
                         {"firstName": "Noam", "lastName": "Shazeer", "creatorType": "author"},
                     ],
+                    "tags": [{"tag": "transformers"}, {"tag": "NLP"}],
                 },
                 "meta": {"creatorSummary": "Vaswani et al."},
             }
         ]
         result = runner.invoke(app, ["search", "attention"])
         assert result.exit_code == 0
-        assert "ABC12345" in result.output
-        assert "2017" in result.output
-        assert "Vaswani" in result.output
-        assert "Attention Is All You Need" in result.output
+        parsed = json.loads(result.output)
+        assert parsed["page"] == 1
+        assert parsed["limit"] == 25
+        assert parsed["start"] == 0
+        assert len(parsed["results"]) == 1
+        item = parsed["results"][0]
+        assert item["key"] == "ABC12345"
+        assert item["title"] == "Attention Is All You Need"
+        assert item["itemType"] == "journalArticle"
+        assert item["date"] == "2017-06-12"
+        assert item["authors"] == ["Vaswani, Ashish", "Shazeer, Noam"]
+        assert item["abstract"] == "We propose a new architecture."
+        assert item["tags"] == ["transformers", "NLP"]
 
     @patch("riszotto.cli.get_client")
     def test_search_no_results(self, mock_get_client):
@@ -41,7 +53,8 @@ class TestSearch:
         mock_zot.items.return_value = []
         result = runner.invoke(app, ["search", "nonexistent"])
         assert result.exit_code == 0
-        assert "KEY" in result.output  # header still present
+        parsed = json.loads(result.output)
+        assert parsed["results"] == []
 
     @patch("riszotto.cli.get_client")
     def test_search_full_text_flag(self, mock_get_client):
@@ -75,31 +88,87 @@ class TestSearch:
         mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=25, start=50)
 
     @patch("riszotto.cli.get_client")
-    def test_search_no_footer_when_single_page(self, mock_get_client):
+    def test_search_page_in_envelope(self, mock_get_client):
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = []
+        result = runner.invoke(app, ["search", "--page", "2", "--limit", "10", "test"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["page"] == 2
+        assert parsed["limit"] == 10
+        assert parsed["start"] == 10
+
+    @patch("riszotto.cli.get_client")
+    def test_search_max_value_size_truncates(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        long_abstract = "A" * 300
         mock_zot.items.return_value = [
             {
-                "data": {"key": "ABC12345", "title": "Paper", "date": "2024", "creators": []},
+                "data": {
+                    "key": "ABC12345",
+                    "title": "Short",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": long_abstract,
+                    "creators": [],
+                    "tags": [],
+                },
                 "meta": {},
             }
         ]
         result = runner.invoke(app, ["search", "test"])
         assert result.exit_code == 0
-        assert "--page 2" not in result.output
+        parsed = json.loads(result.output)
+        assert parsed["results"][0]["abstract"] == "<hidden (300 chars)>"
 
     @patch("riszotto.cli.get_client")
-    def test_search_footer_when_full_page(self, mock_get_client):
+    def test_search_max_value_size_zero_shows_all(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        long_abstract = "A" * 300
+        mock_zot.items.return_value = [
+            {
+                "data": {
+                    "key": "ABC12345",
+                    "title": "Short",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": long_abstract,
+                    "creators": [],
+                    "tags": [],
+                },
+                "meta": {},
+            }
+        ]
+        result = runner.invoke(app, ["search", "--max-value-size", "0", "test"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["results"][0]["abstract"] == long_abstract
+
+    @patch("riszotto.cli.get_client")
+    def test_search_creator_name_field(self, mock_get_client):
+        """Creators with 'name' instead of firstName/lastName (e.g. institutions)."""
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = [
-            {"data": {"key": f"K{i:07d}", "title": f"Paper {i}", "date": "2024", "creators": []}, "meta": {}}
-            for i in range(25)
+            {
+                "data": {
+                    "key": "X1",
+                    "title": "T",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": "",
+                    "creators": [{"name": "WHO", "creatorType": "author"}],
+                    "tags": [],
+                },
+                "meta": {},
+            }
         ]
         result = runner.invoke(app, ["search", "test"])
-        assert result.exit_code == 0
-        assert "Page 1" in result.output
-        assert "--page 2" in result.output
+        parsed = json.loads(result.output)
+        assert parsed["results"][0]["authors"] == ["WHO"]
 
 
 class TestInfo:
