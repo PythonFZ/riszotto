@@ -18,6 +18,7 @@ from riszotto.client import (
     recent_items,
     search_items,
 )
+from riszotto.formatting import format_creator
 
 app = typer.Typer(add_completion=False)
 
@@ -49,15 +50,6 @@ def _filter_long_values(data: dict, max_size: int) -> dict:
     return filtered
 
 
-def _format_creator(creator: dict) -> str:
-    """Format a single Zotero creator dict as a string."""
-    last = creator.get("lastName", "")
-    first = creator.get("firstName", "")
-    if last and first:
-        return f"{last}, {first}"
-    return creator.get("name", last or first)
-
-
 def _format_result(item: dict, max_value_size: int) -> dict:
     """Extract display fields from a Zotero item."""
     data = item.get("data", {})
@@ -66,7 +58,7 @@ def _format_result(item: dict, max_value_size: int) -> dict:
         "title": data.get("title", ""),
         "itemType": data.get("itemType", ""),
         "date": data.get("date", ""),
-        "authors": [_format_creator(c) for c in data.get("creators", [])],
+        "authors": [format_creator(c) for c in data.get("creators", [])],
         "abstract": data.get("abstractNote", ""),
         "tags": [t["tag"] for t in data.get("tags", [])],
     }
