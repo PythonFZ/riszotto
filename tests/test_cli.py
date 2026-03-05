@@ -171,35 +171,6 @@ class TestSearch:
         assert parsed["results"][0]["authors"] == ["WHO"]
 
 
-class TestInfo:
-    @patch("riszotto.cli.get_client")
-    def test_info_outputs_json(self, mock_get_client):
-        mock_zot = MagicMock()
-        mock_get_client.return_value = mock_zot
-        mock_zot.item.return_value = {
-            "data": {
-                "key": "ABC12345",
-                "title": "Test Paper",
-                "DOI": "10.1234/test",
-                "itemType": "journalArticle",
-            }
-        }
-        result = runner.invoke(app, ["info", "ABC12345"])
-        assert result.exit_code == 0
-        parsed = json.loads(result.output)
-        assert parsed["title"] == "Test Paper"
-        assert parsed["DOI"] == "10.1234/test"
-
-    @patch("riszotto.cli.get_client")
-    def test_info_invalid_key(self, mock_get_client):
-        mock_zot = MagicMock()
-        mock_get_client.return_value = mock_zot
-        mock_zot.item.side_effect = Exception("Item not found")
-        result = runner.invoke(app, ["info", "BADKEY"])
-        assert result.exit_code == 1
-        assert "not found" in result.output.lower()
-
-
 class TestShow:
     @patch("riszotto.cli.MarkItDown")
     @patch("riszotto.cli.get_client")
@@ -478,54 +449,3 @@ class TestShow:
         assert "\n--\n" in result.output
 
 
-class TestInfoMaxValueSize:
-    @patch("riszotto.cli.get_client")
-    def test_info_hides_long_values(self, mock_get_client):
-        mock_zot = MagicMock()
-        mock_get_client.return_value = mock_zot
-        mock_zot.item.return_value = {
-            "data": {
-                "key": "ABC12345",
-                "title": "Short",
-                "abstractNote": "A" * 300,
-            }
-        }
-        result = runner.invoke(app, ["info", "ABC12345"])
-        assert result.exit_code == 0
-        parsed = json.loads(result.output)
-        assert parsed["title"] == "Short"
-        assert parsed["abstractNote"] == "<hidden (300 chars)>"
-
-    @patch("riszotto.cli.get_client")
-    def test_info_max_value_size_zero_shows_all(self, mock_get_client):
-        mock_zot = MagicMock()
-        mock_get_client.return_value = mock_zot
-        long_abstract = "A" * 300
-        mock_zot.item.return_value = {
-            "data": {
-                "key": "ABC12345",
-                "title": "Short",
-                "abstractNote": long_abstract,
-            }
-        }
-        result = runner.invoke(app, ["info", "--max-value-size", "0", "ABC12345"])
-        assert result.exit_code == 0
-        parsed = json.loads(result.output)
-        assert parsed["abstractNote"] == long_abstract
-
-    @patch("riszotto.cli.get_client")
-    def test_info_max_value_size_custom(self, mock_get_client):
-        mock_zot = MagicMock()
-        mock_get_client.return_value = mock_zot
-        mock_zot.item.return_value = {
-            "data": {
-                "key": "ABC12345",
-                "title": "Short title",
-                "abstractNote": "A" * 100,
-            }
-        }
-        result = runner.invoke(app, ["info", "--max-value-size", "50", "ABC12345"])
-        assert result.exit_code == 0
-        parsed = json.loads(result.output)
-        assert parsed["title"] == "Short title"  # 11 chars, under 50
-        assert parsed["abstractNote"] == "<hidden (100 chars)>"

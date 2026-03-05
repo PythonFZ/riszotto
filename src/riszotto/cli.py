@@ -8,30 +8,10 @@ from typing import Annotated, Optional
 import typer
 from markitdown import MarkItDown
 
-from riszotto.client import get_client, get_item, get_pdf_attachments, get_pdf_path, search_items
+from riszotto.client import get_client, get_pdf_attachments, get_pdf_path, search_items
 
 app = typer.Typer(add_completion=False)
 
-
-def _format_author(item: dict) -> str:
-    """Extract a short author string from an item."""
-    summary = item.get("meta", {}).get("creatorSummary", "")
-    if summary:
-        return summary
-    creators = item.get("data", {}).get("creators", [])
-    if not creators:
-        return ""
-    first = creators[0]
-    name = first.get("lastName", first.get("name", ""))
-    if len(creators) > 1:
-        return f"{name} et al."
-    return name
-
-
-def _format_year(item: dict) -> str:
-    """Extract year from an item's date field."""
-    date = item.get("data", {}).get("date", "")
-    return date[:4] if len(date) >= 4 else ""
 
 
 def _filter_long_values(data: dict, max_size: int) -> dict:
@@ -99,30 +79,6 @@ def search(
     }
     typer.echo(json.dumps(envelope, indent=2))
 
-
-@app.command()
-def info(
-    key: Annotated[str, typer.Argument(help="Zotero item key")],
-    max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
-) -> None:
-    """Show JSON metadata for a paper."""
-    try:
-        zot = get_client()
-    except (ConnectionError, Exception) as e:
-        if "connection" in str(e).lower() or "refused" in str(e).lower():
-            typer.echo("Zotero desktop is not running. Start Zotero and ensure the local API is enabled.", err=True)
-            raise typer.Exit(1)
-        raise
-
-    try:
-        item = get_item(zot, key)
-    except Exception:
-        typer.echo(f"Item '{key}' not found in your library.", err=True)
-        raise typer.Exit(1)
-
-    data = item.get("data", {})
-    data = _filter_long_values(data, max_value_size)
-    typer.echo(json.dumps(data, indent=2))
 
 
 @app.command()
