@@ -65,3 +65,63 @@ def _get_collection(*, rebuild: bool = False):
             pass
 
     return client.get_or_create_collection(name="zotero")
+
+
+def build_index(zot, *, rebuild: bool = False, limit=None) -> dict[str, int]:
+    """Build or update the semantic search index.
+
+    Fetches items from Zotero and upserts their text into ChromaDB.
+    In incremental mode (rebuild=False), skips items already in the index.
+    """
+    collection = _get_collection(rebuild=rebuild)
+
+    fetch_limit = limit or 100
+    items = zot.items(limit=fetch_limit, itemType="-attachment")
+
+    # Filter out child items
+    top_level = [
+        item for item in items
+        if item.get("data", {}).get("itemType", "").lower() not in _CHILD_ITEM_TYPES
+    ]
+
+    # In incremental mode, skip already-indexed items
+    if not rebuild and collection.count() > 0:
+        existing_ids = set(collection.get()["ids"])
+    else:
+        existing_ids = set()
+
+    ids_to_upsert: list[str] = []
+    docs_to_upsert: list[str] = []
+    metas_to_upsert: list[dict] = []
+    skipped = 0
+
+    for item in top_level:
+        data = item.get("data", {})
+        key = data.get("key", "")
+
+        if key in existing_ids:
+            skipped += 1
+            continue
+
+        doc = _build_document_text(item)
+        if not doc:
+            skipped += 1
+            continue
+
+        ids_to_upsert.append(key)
+        docs_to_upsert.append(doc)
+        metas_to_upsert.append({
+            "title": data.get("title", ""),
+            "itemType": data.get("itemType", ""),
+        })
+
+    # Batch upsert in groups of BATCH_SIZE
+    for i in range(0, len(ids_to_upsert), BATCH_SIZE):
+        batch_end = i + BATCH_SIZE
+        collection.upsert(
+            ids=ids_to_upsert[i:batch_end],
+            documents=docs_to_upsert[i:batch_end],
+            metadatas=metas_to_upsert[i:batch_end],
+        )
+
+    return {"indexed": len(ids_to_upsert), "skipped": skipped}
