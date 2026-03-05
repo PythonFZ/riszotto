@@ -62,7 +62,10 @@ def _get_collection(*, rebuild: bool = False):
         except ValueError:
             pass
 
-    return client.get_or_create_collection(name="zotero")
+    return client.get_or_create_collection(
+        name="zotero",
+        metadata={"hnsw:space": "cosine"},
+    )
 
 
 def build_index(zot, *, rebuild: bool = False, limit: int | None = None) -> dict[str, int]:
