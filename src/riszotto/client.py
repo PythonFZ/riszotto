@@ -28,10 +28,26 @@ def search_items(
     full_text: bool = False,
     limit: int = 25,
     start: int = 0,
+    tag: list[str] | None = None,
+    item_type: str | None = None,
+    since: str | None = None,
+    sort: str | None = None,
+    direction: str | None = None,
 ) -> list[dict[str, Any]]:
     """Search the Zotero library, resolving child items to their parents."""
     qmode = "everything" if full_text else "titleCreatorYear"
-    raw = zot.items(q=query, qmode=qmode, limit=limit, start=start)
+    kwargs: dict[str, Any] = {"q": query, "qmode": qmode, "limit": limit, "start": start}
+    if tag is not None:
+        kwargs["tag"] = tag if len(tag) > 1 else tag[0]
+    if item_type is not None:
+        kwargs["itemType"] = item_type
+    if since is not None:
+        kwargs["since"] = since
+    if sort is not None:
+        kwargs["sort"] = sort
+    if direction is not None:
+        kwargs["direction"] = direction
+    raw = zot.items(**kwargs)
 
     results: list[dict[str, Any]] = []
     seen_keys: set[str] = set()

@@ -170,6 +170,43 @@ class TestSearch:
         parsed = json.loads(result.output)
         assert parsed["results"][0]["authors"] == ["WHO"]
 
+    @patch("riszotto.cli.search_items")
+    @patch("riszotto.cli.get_client")
+    def test_search_tag_flag(self, mock_get_client, mock_search_items):
+        mock_get_client.return_value = MagicMock()
+        mock_search_items.return_value = []
+        runner.invoke(app, ["search", "--tag", "physics", "test"])
+        _, kwargs = mock_search_items.call_args
+        assert kwargs["tag"] == ["physics"]
+
+    @patch("riszotto.cli.search_items")
+    @patch("riszotto.cli.get_client")
+    def test_search_multiple_tags(self, mock_get_client, mock_search_items):
+        mock_get_client.return_value = MagicMock()
+        mock_search_items.return_value = []
+        runner.invoke(app, ["search", "--tag", "ml", "--tag", "physics", "test"])
+        _, kwargs = mock_search_items.call_args
+        assert kwargs["tag"] == ["ml", "physics"]
+
+    @patch("riszotto.cli.search_items")
+    @patch("riszotto.cli.get_client")
+    def test_search_item_type_flag(self, mock_get_client, mock_search_items):
+        mock_get_client.return_value = MagicMock()
+        mock_search_items.return_value = []
+        runner.invoke(app, ["search", "--item-type", "book", "test"])
+        _, kwargs = mock_search_items.call_args
+        assert kwargs["item_type"] == "book"
+
+    @patch("riszotto.cli.search_items")
+    @patch("riszotto.cli.get_client")
+    def test_search_sort_flags(self, mock_get_client, mock_search_items):
+        mock_get_client.return_value = MagicMock()
+        mock_search_items.return_value = []
+        runner.invoke(app, ["search", "--sort", "dateModified", "--direction", "asc", "test"])
+        _, kwargs = mock_search_items.call_args
+        assert kwargs["sort"] == "dateModified"
+        assert kwargs["direction"] == "asc"
+
 
 class TestConnectionError:
     @patch("riszotto.cli.get_client")

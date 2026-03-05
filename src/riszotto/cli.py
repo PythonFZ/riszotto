@@ -72,12 +72,20 @@ def search(
     limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 25,
     page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed)")] = 1,
     max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
+    tag: Annotated[Optional[list[str]], typer.Option("--tag", "-t", help="Filter by tag (repeatable, AND logic)")] = None,
+    item_type: Annotated[Optional[str], typer.Option("--item-type", help="Filter by item type (e.g. journalArticle, book)")] = None,
+    since: Annotated[Optional[str], typer.Option("--since", help="Only items modified after this date")] = None,
+    sort: Annotated[Optional[str], typer.Option("--sort", help="Sort field (e.g. dateModified, title, creator)")] = None,
+    direction: Annotated[Optional[str], typer.Option("--direction", help="Sort direction (asc or desc)")] = None,
 ) -> None:
     """Search for papers in your Zotero library."""
     query = " ".join(terms)
     start = (page - 1) * limit
     zot = _get_zot()
-    results = search_items(zot, query, full_text=full_text, limit=limit, start=start)
+    results = search_items(
+        zot, query, full_text=full_text, limit=limit, start=start,
+        tag=tag, item_type=item_type, since=since, sort=sort, direction=direction,
+    )
 
     envelope = {
         "page": page,

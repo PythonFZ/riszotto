@@ -85,6 +85,46 @@ class TestSearchItems:
         assert results[1]["data"]["key"] == "P2"
         mock_zot.item.assert_not_called()
 
+    def test_search_with_tag_filter(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = []
+        search_items(mock_zot, "test", full_text=False, limit=25, tag=["physics"])
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=25, start=0, tag="physics"
+        )
+
+    def test_search_with_multiple_tags(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = []
+        search_items(mock_zot, "test", full_text=False, limit=25, tag=["ml", "physics"])
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=25, start=0, tag=["ml", "physics"]
+        )
+
+    def test_search_with_item_type(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = []
+        search_items(mock_zot, "test", full_text=False, limit=25, item_type="book")
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=25, start=0, itemType="book"
+        )
+
+    def test_search_with_since(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = []
+        search_items(mock_zot, "test", full_text=False, limit=25, since="2024-01-01")
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=25, start=0, since="2024-01-01"
+        )
+
+    def test_search_with_sort(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = []
+        search_items(mock_zot, "test", full_text=False, limit=25, sort="dateModified", direction="asc")
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=25, start=0, sort="dateModified", direction="asc"
+        )
+
 
 class TestGetItem:
     def test_returns_item(self):
