@@ -9,7 +9,14 @@ import typer
 from markitdown import MarkItDown
 from pyzotero import zotero
 
-from riszotto.client import get_client, get_pdf_attachments, get_pdf_path, search_items
+from riszotto.client import (
+    collection_items,
+    get_client,
+    get_pdf_attachments,
+    get_pdf_path,
+    list_collections,
+    search_items,
+)
 
 app = typer.Typer(add_completion=False)
 
@@ -194,10 +201,37 @@ def _grep_lines(markdown: str, terms: list[str], context: int = 3) -> str | None
     return "\n".join(output)
 
 
+def _format_collection(col: dict) -> dict:
+    """Extract display fields from a Zotero collection."""
+    data = col.get("data", {})
+    return {
+        "key": data.get("key", ""),
+        "name": data.get("name", ""),
+        "parentCollection": data.get("parentCollection", False),
+    }
+
+
 @app.command()
 def collections(
     key: Annotated[Optional[str], typer.Argument(help="Collection key (omit to list all)")] = None,
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 25,
+    page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed)")] = 1,
+    max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
 ) -> None:
     """List collections or items in a collection."""
     zot = _get_zot()
-    typer.echo(json.dumps({"results": []}, indent=2))
+    if key is None:
+        cols = list_collections(zot)
+        envelope = {
+            "results": [_format_collection(c) for c in cols],
+        }
+    else:
+        start = (page - 1) * limit
+        items = collection_items(zot, key, limit=limit, start=start)
+        envelope = {
+            "page": page,
+            "limit": limit,
+            "start": start,
+            "results": [_format_result(item, max_value_size) for item in items],
+        }
+    typer.echo(json.dumps(envelope, indent=2))

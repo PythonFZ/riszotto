@@ -1,6 +1,14 @@
 from unittest.mock import MagicMock, patch
 
-from riszotto.client import get_client, search_items, get_item, get_pdf_attachments, get_pdf_path
+from riszotto.client import (
+    collection_items,
+    get_client,
+    get_item,
+    get_pdf_attachments,
+    get_pdf_path,
+    list_collections,
+    search_items,
+)
 
 
 class TestGetClient:
@@ -157,6 +165,42 @@ class TestGetPdfAttachments:
         mock_zot.children.return_value = []
         pdfs = get_pdf_attachments(mock_zot, "PARENT1")
         assert pdfs == []
+
+
+class TestListCollections:
+    def test_returns_collections(self):
+        mock_zot = MagicMock()
+        mock_zot.collections.return_value = [
+            {"data": {"key": "COL1", "name": "Physics", "parentCollection": False}},
+            {"data": {"key": "COL2", "name": "Subfield", "parentCollection": "COL1"}},
+        ]
+        result = list_collections(mock_zot)
+        mock_zot.collections.assert_called_once()
+        assert len(result) == 2
+        assert result[0]["data"]["key"] == "COL1"
+
+    def test_returns_empty_list(self):
+        mock_zot = MagicMock()
+        mock_zot.collections.return_value = []
+        result = list_collections(mock_zot)
+        assert result == []
+
+
+class TestCollectionItems:
+    def test_returns_items(self):
+        mock_zot = MagicMock()
+        mock_zot.collection_items.return_value = [
+            {"data": {"key": "P1", "title": "Paper 1"}},
+        ]
+        result = collection_items(mock_zot, "COL1", limit=10, start=0)
+        mock_zot.collection_items.assert_called_once_with("COL1", limit=10, start=0)
+        assert len(result) == 1
+
+    def test_default_pagination(self):
+        mock_zot = MagicMock()
+        mock_zot.collection_items.return_value = []
+        collection_items(mock_zot, "COL1")
+        mock_zot.collection_items.assert_called_once_with("COL1", limit=25, start=0)
 
 
 class TestGetPdfPath:

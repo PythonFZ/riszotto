@@ -495,3 +495,62 @@ class TestShow:
         assert "\n--\n" in result.output
 
 
+class TestCollections:
+    @patch("riszotto.cli.list_collections")
+    @patch("riszotto.cli.get_client")
+    def test_list_collections(self, mock_get_client, mock_list_collections):
+        mock_get_client.return_value = MagicMock()
+        mock_list_collections.return_value = [
+            {"data": {"key": "COL1", "name": "Physics", "parentCollection": False}},
+            {"data": {"key": "COL2", "name": "ML", "parentCollection": "COL1"}},
+        ]
+        result = runner.invoke(app, ["collections"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["results"]) == 2
+        assert parsed["results"][0]["key"] == "COL1"
+        assert parsed["results"][0]["name"] == "Physics"
+        assert parsed["results"][1]["parentCollection"] == "COL1"
+
+    @patch("riszotto.cli.collection_items")
+    @patch("riszotto.cli.get_client")
+    def test_collection_items(self, mock_get_client, mock_collection_items):
+        mock_get_client.return_value = MagicMock()
+        mock_collection_items.return_value = [
+            {
+                "data": {
+                    "key": "P1",
+                    "title": "Paper 1",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": "",
+                    "creators": [],
+                    "tags": [],
+                },
+            }
+        ]
+        result = runner.invoke(app, ["collections", "COL1"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["page"] == 1
+        assert parsed["limit"] == 25
+        assert parsed["start"] == 0
+        assert len(parsed["results"]) == 1
+        assert parsed["results"][0]["key"] == "P1"
+
+    @patch("riszotto.cli.collection_items")
+    @patch("riszotto.cli.get_client")
+    def test_collection_items_pagination(self, mock_get_client, mock_collection_items):
+        mock_get_client.return_value = MagicMock()
+        mock_collection_items.return_value = []
+        result = runner.invoke(app, ["collections", "COL1", "--page", "3", "--limit", "10"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["page"] == 3
+        assert parsed["limit"] == 10
+        assert parsed["start"] == 20
+        call_args = mock_collection_items.call_args
+        assert call_args[0][1] == "COL1"
+        assert call_args[1] == {"limit": 10, "start": 20}
+
+

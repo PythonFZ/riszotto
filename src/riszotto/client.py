@@ -85,6 +85,22 @@ def get_pdf_attachments(zot: zotero.Zotero, key: str) -> list[dict[str, Any]]:
     ]
 
 
+def list_collections(zot: zotero.Zotero) -> list[dict[str, Any]]:
+    """Get all collections in the library."""
+    return zot.collections()
+
+
+def collection_items(
+    zot: zotero.Zotero,
+    collection_key: str,
+    *,
+    limit: int = 25,
+    start: int = 0,
+) -> list[dict[str, Any]]:
+    """Get items in a specific collection."""
+    return zot.collection_items(collection_key, limit=limit, start=start)
+
+
 def get_pdf_path(attachment: dict[str, Any]) -> str | None:
     """Extract the local file path from an attachment's enclosure link."""
     href = attachment.get("links", {}).get("enclosure", {}).get("href")
