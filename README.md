@@ -1,4 +1,4 @@
-# riszotto
+# Research Zotero - riszotto
 
 CLI tool for searching and reading papers from your local Zotero library.
 

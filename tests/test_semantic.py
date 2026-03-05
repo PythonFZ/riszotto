@@ -59,7 +59,8 @@ class TestBuildIndex:
         mock_collection.count.return_value = 0
 
         mock_zot = MagicMock()
-        mock_zot.items.return_value = [
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = [
             {
                 "data": {
                     "key": "KEY1",
@@ -97,7 +98,8 @@ class TestBuildIndex:
         mock_collection.count.return_value = 0
 
         mock_zot = MagicMock()
-        mock_zot.items.return_value = [
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = [
             {
                 "data": {
                     "key": "PARENT1",
@@ -147,7 +149,8 @@ class TestBuildIndex:
         mock_collection.get.return_value = {"ids": ["KEY1"]}
 
         mock_zot = MagicMock()
-        mock_zot.items.return_value = [
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = [
             {
                 "data": {
                     "key": "KEY1",
@@ -182,7 +185,8 @@ class TestBuildIndex:
         mock_get_col.return_value = mock_collection
 
         mock_zot = MagicMock()
-        mock_zot.items.return_value = [
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = [
             {
                 "data": {
                     "key": "KEY1",
@@ -217,7 +221,8 @@ class TestBuildIndex:
         mock_collection.count.return_value = 0
 
         mock_zot = MagicMock()
-        mock_zot.items.return_value = []
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = []
 
         result = build_index(mock_zot)
         assert result["indexed"] == 0
@@ -233,7 +238,7 @@ class TestBuildIndex:
         mock_zot.items.return_value = []
 
         build_index(mock_zot, limit=100)
-        mock_zot.items.assert_called_once_with(limit=100, itemType="-attachment")
+        mock_zot.top.assert_called_once_with(limit=100)
 
 
 class TestSemanticSearch:

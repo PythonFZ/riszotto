@@ -80,10 +80,6 @@ Key patterns borrowed from [zotero-mcp](https://github.com/54yyyu/zotero-mcp):
 - Local file path extraction from `links.enclosure.href`
 - markitdown conversion: `MarkItDown().convert(str(path)).text_content`
 
-### No Pydantic
-
-Dict access with type hints on helper functions. The 3 commands are simple enough that Pydantic models would be over-engineering. Can add later if scope grows.
-
 ## Dependencies
 
 - `typer` — CLI framework

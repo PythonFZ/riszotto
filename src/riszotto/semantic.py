@@ -76,8 +76,10 @@ def build_index(zot, *, rebuild: bool = False, limit: int | None = None) -> dict
     """
     collection = _get_collection(rebuild=rebuild)
 
-    fetch_limit = limit or 100
-    items = zot.items(limit=fetch_limit, itemType="-attachment")
+    if limit is not None:
+        items = zot.top(limit=limit)
+    else:
+        items = zot.everything(zot.top())
 
     # Filter out child items
     top_level = [
@@ -91,12 +93,14 @@ def build_index(zot, *, rebuild: bool = False, limit: int | None = None) -> dict
     else:
         existing_ids = set()
 
+    from tqdm import tqdm
+
     ids_to_upsert: list[str] = []
     docs_to_upsert: list[str] = []
     metas_to_upsert: list[dict] = []
     skipped = 0
 
-    for item in top_level:
+    for item in tqdm(top_level, desc="Processing items", unit="item"):
         data = item.get("data", {})
         key = data.get("key", "")
 
@@ -117,7 +121,7 @@ def build_index(zot, *, rebuild: bool = False, limit: int | None = None) -> dict
         })
 
     # Batch upsert in groups of BATCH_SIZE
-    for i in range(0, len(ids_to_upsert), BATCH_SIZE):
+    for i in tqdm(range(0, len(ids_to_upsert), BATCH_SIZE), desc="Upserting", unit="batch"):
         batch_end = i + BATCH_SIZE
         collection.upsert(
             ids=ids_to_upsert[i:batch_end],
