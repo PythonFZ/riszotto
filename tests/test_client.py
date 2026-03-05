@@ -7,6 +7,7 @@ from riszotto.client import (
     get_pdf_attachments,
     get_pdf_path,
     list_collections,
+    recent_items,
     search_items,
 )
 
@@ -201,6 +202,27 @@ class TestCollectionItems:
         mock_zot.collection_items.return_value = []
         collection_items(mock_zot, "COL1")
         mock_zot.collection_items.assert_called_once_with("COL1", limit=25, start=0)
+
+
+class TestRecentItems:
+    def test_returns_recent_items(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = [
+            {"data": {"key": "P1", "title": "Recent Paper"}},
+        ]
+        result = recent_items(mock_zot, limit=5)
+        mock_zot.items.assert_called_once_with(
+            sort="dateAdded", direction="desc", limit=5, itemType="-attachment"
+        )
+        assert len(result) == 1
+
+    def test_default_limit(self):
+        mock_zot = MagicMock()
+        mock_zot.items.return_value = []
+        recent_items(mock_zot)
+        mock_zot.items.assert_called_once_with(
+            sort="dateAdded", direction="desc", limit=10, itemType="-attachment"
+        )
 
 
 class TestGetPdfPath:

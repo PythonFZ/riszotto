@@ -101,6 +101,15 @@ def collection_items(
     return zot.collection_items(collection_key, limit=limit, start=start)
 
 
+def recent_items(
+    zot: zotero.Zotero,
+    *,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Get recently added items, excluding attachments."""
+    return zot.items(sort="dateAdded", direction="desc", limit=limit, itemType="-attachment")
+
+
 def get_pdf_path(attachment: dict[str, Any]) -> str | None:
     """Extract the local file path from an attachment's enclosure link."""
     href = attachment.get("links", {}).get("enclosure", {}).get("href")

@@ -15,6 +15,7 @@ from riszotto.client import (
     get_pdf_attachments,
     get_pdf_path,
     list_collections,
+    recent_items,
     search_items,
 )
 
@@ -234,4 +235,19 @@ def collections(
             "start": start,
             "results": [_format_result(item, max_value_size) for item in items],
         }
+    typer.echo(json.dumps(envelope, indent=2))
+
+
+@app.command()
+def recent(
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 10,
+    max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
+) -> None:
+    """Show recently added papers."""
+    zot = _get_zot()
+    items = recent_items(zot, limit=limit)
+    envelope = {
+        "limit": limit,
+        "results": [_format_result(item, max_value_size) for item in items],
+    }
     typer.echo(json.dumps(envelope, indent=2))

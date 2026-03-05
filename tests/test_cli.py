@@ -554,3 +554,49 @@ class TestCollections:
         assert call_args[1] == {"limit": 10, "start": 20}
 
 
+class TestRecent:
+    @patch("riszotto.cli.recent_items")
+    @patch("riszotto.cli.get_client")
+    def test_recent_outputs_json(self, mock_get_client, mock_recent_items):
+        mock_get_client.return_value = MagicMock()
+        mock_recent_items.return_value = [
+            {
+                "data": {
+                    "key": "P1",
+                    "title": "Recent Paper",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": "",
+                    "creators": [],
+                    "tags": [],
+                },
+            }
+        ]
+        result = runner.invoke(app, ["recent"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["limit"] == 10
+        assert len(parsed["results"]) == 1
+        assert parsed["results"][0]["key"] == "P1"
+
+    @patch("riszotto.cli.recent_items")
+    @patch("riszotto.cli.get_client")
+    def test_recent_custom_limit(self, mock_get_client, mock_recent_items):
+        mock_get_client.return_value = MagicMock()
+        mock_recent_items.return_value = []
+        result = runner.invoke(app, ["recent", "--limit", "5"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["limit"] == 5
+        mock_recent_items.assert_called_once()
+        _, kwargs = mock_recent_items.call_args
+        assert kwargs["limit"] == 5
+
+    @patch("riszotto.cli.get_client")
+    def test_recent_zotero_not_running(self, mock_get_client):
+        mock_get_client.side_effect = ConnectionError("connection refused")
+        result = runner.invoke(app, ["recent"])
+        assert result.exit_code == 1
+        assert "Zotero desktop is not running" in result.output
+
+
