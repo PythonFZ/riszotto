@@ -625,6 +625,51 @@ class TestShow:
         assert "\n--\n" in result.output
 
 
+class TestExport:
+    @patch("riszotto.cli.get_item_bibtex")
+    @patch("riszotto.cli.get_client")
+    def test_export_default_bibtex(self, mock_get_client, mock_get_bibtex):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_get_bibtex.return_value = "@article{doe2024, title={Test Paper}}"
+
+        result = runner.invoke(app, ["export", "ABC123"])
+        assert result.exit_code == 0
+        assert "@article{doe2024, title={Test Paper}}" in result.output
+        from riszotto.client import DEFAULT_BIBTEX_EXCLUDE
+        mock_get_bibtex.assert_called_once_with(mock_zot, "ABC123", exclude=DEFAULT_BIBTEX_EXCLUDE)
+
+    @patch("riszotto.cli.get_item_bibtex")
+    @patch("riszotto.cli.get_client")
+    def test_export_include_all(self, mock_get_client, mock_get_bibtex):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_get_bibtex.return_value = "@article{doe2024, title={Test}}"
+
+        result = runner.invoke(app, ["export", "ABC123", "--include-all"])
+        assert result.exit_code == 0
+        mock_get_bibtex.assert_called_once_with(mock_zot, "ABC123", exclude=set())
+
+    @patch("riszotto.cli.get_item_bibtex")
+    @patch("riszotto.cli.get_client")
+    def test_export_custom_exclude(self, mock_get_client, mock_get_bibtex):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_get_bibtex.return_value = "@article{doe2024, title={Test}}"
+
+        result = runner.invoke(app, ["export", "ABC123", "--exclude", "file", "--exclude", "note"])
+        assert result.exit_code == 0
+        mock_get_bibtex.assert_called_once_with(mock_zot, "ABC123", exclude={"file", "note"})
+
+    @patch("riszotto.cli.get_client")
+    def test_export_unknown_format(self, mock_get_client):
+        mock_get_client.return_value = MagicMock()
+
+        result = runner.invoke(app, ["export", "ABC123", "--format", "csv"])
+        assert result.exit_code == 1
+        assert "Unknown format" in result.output
+
+
 class TestCollections:
     @patch("riszotto.cli.list_collections")
     @patch("riszotto.cli.get_client")

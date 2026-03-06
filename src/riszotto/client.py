@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 from urllib.parse import unquote, urlparse
 
 from pyzotero import zotero
 
 from riszotto.formatting import CHILD_ITEM_TYPES
+
+DEFAULT_BIBTEX_EXCLUDE: set[str] = {"file", "abstract", "note", "keywords", "urldate", "annote"}
 
 
 def get_client() -> zotero.Zotero:
@@ -107,6 +110,50 @@ def recent_items(
 ) -> list[dict[str, Any]]:
     """Get recently added items, excluding attachments."""
     return zot.items(sort="dateAdded", direction="desc", limit=limit, itemType="-attachment")
+
+
+def get_item_bibtex(zot: zotero.Zotero, key: str, *, exclude: set[str] | None = None) -> str:
+    """Get a single item's BibTeX entry, optionally stripping fields."""
+    result = zot.item(key, format="bibtex")
+    bibtex = result.decode("utf-8") if isinstance(result, bytes) else str(result)
+    if exclude:
+        bibtex = _filter_bibtex_fields(bibtex, exclude)
+    return bibtex
+
+
+def _filter_bibtex_fields(bibtex: str, exclude: set[str]) -> str:
+    """Remove fields from a BibTeX entry string.
+
+    Uses line-by-line brace counting to handle multi-line values (e.g. abstracts).
+    """
+    lines = bibtex.splitlines(keepends=True)
+    result: list[str] = []
+    skipping = False
+    brace_depth = 0
+
+    field_re = re.compile(r"^\s*(\w+)\s*=\s*")
+
+    for line in lines:
+        if skipping:
+            brace_depth += line.count("{") - line.count("}")
+            if brace_depth <= 0:
+                skipping = False
+                brace_depth = 0
+            continue
+
+        m = field_re.match(line)
+        if m and m.group(1) in exclude:
+            brace_depth = line.count("{") - line.count("}")
+            if brace_depth > 0:
+                skipping = True
+            continue
+
+        result.append(line)
+
+    # Clean up trailing comma before closing brace
+    text = "".join(result)
+    text = re.sub(r",\s*\n(\s*})", r"\n\1", text)
+    return text
 
 
 def get_pdf_path(attachment: dict[str, Any]) -> str | None:

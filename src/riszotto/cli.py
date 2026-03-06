@@ -10,8 +10,10 @@ from markitdown import MarkItDown
 from pyzotero import zotero
 
 from riszotto.client import (
+    DEFAULT_BIBTEX_EXCLUDE,
     collection_items,
     get_client,
+    get_item_bibtex,
     get_pdf_attachments,
     get_pdf_path,
     list_collections,
@@ -195,6 +197,23 @@ def show(
         return
 
     _show_paginated(markdown, page, page_size, key)
+
+
+@app.command()
+def export(
+    key: Annotated[str, typer.Argument(help="Zotero item key")],
+    format: Annotated[str, typer.Option("--format", "-f", help="Export format")] = "bibtex",
+    exclude: Annotated[Optional[list[str]], typer.Option("--exclude", "-e", help="BibTeX fields to exclude (repeatable)")] = None,
+    include_all: Annotated[bool, typer.Option("--include-all", help="Don't exclude any fields")] = False,
+) -> None:
+    """Export an item in the specified format."""
+    zot = _get_zot()
+    if format == "bibtex":
+        excluded = set() if include_all else (set(exclude) if exclude else DEFAULT_BIBTEX_EXCLUDE)
+        typer.echo(get_item_bibtex(zot, key, exclude=excluded))
+    else:
+        typer.echo(f"Unknown format: {format}", err=True)
+        raise typer.Exit(1)
 
 
 def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:

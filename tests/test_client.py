@@ -1,9 +1,12 @@
 from unittest.mock import MagicMock, patch
 
 from riszotto.client import (
+    DEFAULT_BIBTEX_EXCLUDE,
+    _filter_bibtex_fields,
     collection_items,
     get_client,
     get_item,
+    get_item_bibtex,
     get_pdf_attachments,
     get_pdf_path,
     list_collections,
@@ -223,6 +226,117 @@ class TestRecentItems:
         mock_zot.items.assert_called_once_with(
             sort="dateAdded", direction="desc", limit=10, itemType="-attachment"
         )
+
+
+class TestGetItemBibtex:
+    def test_decodes_bytes(self):
+        mock_zot = MagicMock()
+        bibtex_bytes = b"@article{doe2024, title={Test}}"
+        mock_zot.item.return_value = bibtex_bytes
+        result = get_item_bibtex(mock_zot, "ABC123")
+        mock_zot.item.assert_called_once_with("ABC123", format="bibtex")
+        assert result == "@article{doe2024, title={Test}}"
+
+    def test_handles_string(self):
+        mock_zot = MagicMock()
+        mock_zot.item.return_value = "@article{doe2024, title={Test}}"
+        result = get_item_bibtex(mock_zot, "ABC123")
+        assert result == "@article{doe2024, title={Test}}"
+
+    def test_exclude_strips_fields(self):
+        mock_zot = MagicMock()
+        bibtex = (
+            "@article{doe2024,\n"
+            "  title = {Test},\n"
+            "  abstract = {Long abstract text},\n"
+            "  author = {Doe, John}\n"
+            "}"
+        )
+        mock_zot.item.return_value = bibtex.encode()
+        result = get_item_bibtex(mock_zot, "ABC123", exclude={"abstract"})
+        assert "abstract" not in result
+        assert "title = {Test}" in result
+        assert "author = {Doe, John}" in result
+
+    def test_exclude_empty_set_keeps_all(self):
+        mock_zot = MagicMock()
+        bibtex = "@article{doe2024,\n  title = {Test},\n  abstract = {Abs}\n}"
+        mock_zot.item.return_value = bibtex.encode()
+        result = get_item_bibtex(mock_zot, "ABC123", exclude=set())
+        assert "abstract = {Abs}" in result
+
+    def test_exclude_none_keeps_all(self):
+        mock_zot = MagicMock()
+        bibtex = "@article{doe2024,\n  title = {Test},\n  abstract = {Abs}\n}"
+        mock_zot.item.return_value = bibtex.encode()
+        result = get_item_bibtex(mock_zot, "ABC123")
+        assert "abstract = {Abs}" in result
+
+
+class TestFilterBibtexFields:
+    def test_removes_single_line_field(self):
+        bibtex = (
+            "@article{doe2024,\n"
+            "  title = {Test Paper},\n"
+            "  file = {/path/to/file.pdf},\n"
+            "  author = {Doe, John}\n"
+            "}"
+        )
+        result = _filter_bibtex_fields(bibtex, {"file"})
+        assert "file" not in result
+        assert "title = {Test Paper}" in result
+        assert "author = {Doe, John}" in result
+
+    def test_removes_multiline_field(self):
+        bibtex = (
+            "@article{doe2024,\n"
+            "  title = {Test},\n"
+            "  abstract = {This is a long\n"
+            "abstract that spans\n"
+            "multiple lines},\n"
+            "  author = {Doe, John}\n"
+            "}"
+        )
+        result = _filter_bibtex_fields(bibtex, {"abstract"})
+        assert "abstract" not in result
+        assert "multiple lines" not in result
+        assert "title = {Test}" in result
+        assert "author = {Doe, John}" in result
+
+    def test_removes_multiple_fields(self):
+        bibtex = (
+            "@article{doe2024,\n"
+            "  title = {Test},\n"
+            "  file = {/path.pdf},\n"
+            "  abstract = {Abs},\n"
+            "  note = {Some note},\n"
+            "  author = {Doe}\n"
+            "}"
+        )
+        result = _filter_bibtex_fields(bibtex, {"file", "abstract", "note"})
+        assert "file" not in result
+        assert "abstract" not in result
+        assert "note" not in result
+        assert "title = {Test}" in result
+        assert "author = {Doe}" in result
+
+    def test_default_exclude_set_has_expected_fields(self):
+        assert "file" in DEFAULT_BIBTEX_EXCLUDE
+        assert "abstract" in DEFAULT_BIBTEX_EXCLUDE
+        assert "note" in DEFAULT_BIBTEX_EXCLUDE
+        assert "keywords" in DEFAULT_BIBTEX_EXCLUDE
+        assert "urldate" in DEFAULT_BIBTEX_EXCLUDE
+        assert "annote" in DEFAULT_BIBTEX_EXCLUDE
+
+    def test_no_trailing_comma_before_closing_brace(self):
+        bibtex = (
+            "@article{doe2024,\n"
+            "  title = {Test},\n"
+            "  file = {/path.pdf}\n"
+            "}"
+        )
+        result = _filter_bibtex_fields(bibtex, {"file"})
+        assert ",\n}" not in result
 
 
 class TestGetPdfPath:
