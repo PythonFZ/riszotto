@@ -1,13 +1,21 @@
 # Research Zotero - riszotto
 
-CLI tool for searching and reading papers from your local Zotero library.
+CLI tool for searching, reading, and exporting papers from your local Zotero library.
 
 Requires Zotero desktop to be running with the local API enabled.
 
-## Install
+## Getting Started
 
-```
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/).
+
+```bash
 uvx riszotto --help
+```
+
+For semantic search:
+
+```bash
+uvx --with "riszotto[semantic]" riszotto search --semantic "query"
 ```
 
 ## Usage
@@ -16,15 +24,40 @@ uvx riszotto --help
 # Search your library
 riszotto search machine learning transformers
 
-# Search full-text content
+# Full-text search
 riszotto search --full-text "attention mechanism"
 
-# View paper metadata as JSON
-riszotto info ABC12345
+# Semantic search (requires index)
+riszotto search --semantic "how do transformers work"
+
+# Filter by author or tag
+riszotto search "deep learning" --author "Hinton"
+riszotto search "ML" --tag "papers" --tag "2024"
 
 # Read a paper's PDF as markdown
 riszotto show ABC12345
+riszotto show ABC12345 --page 2
+riszotto show ABC12345 --search "methodology"
 
-# Select a specific PDF attachment (1-indexed)
-riszotto show --attachment 2 ABC12345
+# Export BibTeX
+riszotto export ABC12345
+
+# Browse collections and recent papers
+riszotto collections
+riszotto recent
+
+# Build semantic search index
+riszotto index
 ```
+
+## Claude Code Skill
+
+Install the skill to help Claude Code agents use riszotto:
+
+```bash
+npx skills add https://github.com/pythonfz/riszotto
+```
+
+## Acknowledgments
+
+Inspired by [zotero-mcp](https://github.com/54yyyu/zotero-mcp).

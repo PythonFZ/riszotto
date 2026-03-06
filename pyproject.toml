@@ -13,6 +13,9 @@ dependencies = [
 [project.scripts]
 riszotto = "riszotto.cli:app"
 
+[project.urls]
+Repository = "https://github.com/PythonFZ/riszotto"
+
 [project.optional-dependencies]
 semantic = [
     "chromadb>=0.4.0",
