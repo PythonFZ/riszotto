@@ -46,6 +46,16 @@ def _get_zot() -> zotero.Zotero:
         raise
 
 
+def _matches_author(item: dict, author: str) -> bool:
+    """Check if any creator name contains the author substring (case-insensitive)."""
+    needle = author.lower()
+    for creator in item.get("data", {}).get("creators", []):
+        name = format_creator(creator).lower()
+        if needle in name:
+            return True
+    return False
+
+
 def _filter_long_values(data: dict, max_size: int) -> dict:
     """Replace string values longer than max_size with a placeholder."""
     if max_size <= 0:
@@ -87,6 +97,7 @@ def search(
     since: Annotated[Optional[str], typer.Option("--since", help="Only items modified after this date")] = None,
     sort: Annotated[Optional[str], typer.Option("--sort", help="Sort field (e.g. dateModified, title, creator)")] = None,
     direction: Annotated[Optional[str], typer.Option("--direction", help="Sort direction (asc or desc)")] = None,
+    author: Annotated[Optional[str], typer.Option("--author", help="Filter results by author name (case-insensitive substring match)")] = None,
 ) -> None:
     """Search for papers in your Zotero library."""
     query = " ".join(terms)
@@ -105,6 +116,8 @@ def search(
         results = []
         for hit in hits:
             item = zot.item(hit["key"])
+            if author and not _matches_author(item, author):
+                continue
             formatted = _format_result(item, max_value_size)
             formatted["score"] = hit["score"]
             results.append(formatted)
@@ -124,6 +137,9 @@ def search(
         zot, query, full_text=full_text, limit=limit, start=start,
         tag=tag, item_type=item_type, since=since, sort=sort, direction=direction,
     )
+
+    if author:
+        results = [item for item in results if _matches_author(item, author)]
 
     envelope = {
         "page": page,

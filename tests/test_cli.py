@@ -207,6 +207,32 @@ class TestSearch:
         assert kwargs["sort"] == "dateModified"
         assert kwargs["direction"] == "asc"
 
+    @patch("riszotto.cli.get_client")
+    def test_search_author_filters_results(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = [
+            {
+                "data": {
+                    "key": "K1", "title": "Paper A", "itemType": "journalArticle",
+                    "date": "2024", "abstractNote": "", "tags": [],
+                    "creators": [{"firstName": "Alice", "lastName": "Smith", "creatorType": "author"}],
+                },
+            },
+            {
+                "data": {
+                    "key": "K2", "title": "Paper B", "itemType": "journalArticle",
+                    "date": "2024", "abstractNote": "", "tags": [],
+                    "creators": [{"firstName": "Bob", "lastName": "Jones", "creatorType": "author"}],
+                },
+            },
+        ]
+        result = runner.invoke(app, ["search", "--author", "smith", "test"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["results"]) == 1
+        assert parsed["results"][0]["key"] == "K1"
+
 
 class TestSearchSemantic:
     @patch("riszotto.cli.get_client")
@@ -265,6 +291,40 @@ class TestSearchSemantic:
         result = runner.invoke(app, ["search", "--semantic", "test"])
         assert result.exit_code == 1
         assert "semantic" in result.output.lower()
+
+    @patch("riszotto.cli.get_client")
+    @patch("riszotto.cli._import_semantic")
+    def test_semantic_search_author_filters(self, mock_import_semantic, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.semantic_search.return_value = [
+            {"key": "P1", "title": "Paper One", "itemType": "journalArticle", "score": 0.95},
+            {"key": "P2", "title": "Paper Two", "itemType": "book", "score": 0.80},
+        ]
+        mock_zot.item.side_effect = lambda key: {
+            "P1": {
+                "data": {
+                    "key": "P1", "title": "Paper One", "itemType": "journalArticle",
+                    "date": "2024", "abstractNote": "", "tags": [],
+                    "creators": [{"firstName": "Alice", "lastName": "Smith", "creatorType": "author"}],
+                },
+            },
+            "P2": {
+                "data": {
+                    "key": "P2", "title": "Paper Two", "itemType": "book",
+                    "date": "2023", "abstractNote": "", "tags": [],
+                    "creators": [{"firstName": "Bob", "lastName": "Jones", "creatorType": "author"}],
+                },
+            },
+        }[key]
+
+        result = runner.invoke(app, ["search", "--semantic", "--author", "jones", "test"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["results"]) == 1
+        assert parsed["results"][0]["key"] == "P2"
 
     @patch("riszotto.cli.get_client")
     @patch("riszotto.cli._import_semantic")
