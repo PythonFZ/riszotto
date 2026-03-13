@@ -1,5 +1,11 @@
 # Research Zotero - riszotto
 
+![riszotto](assets/riszotto.png)
+
+[![PyPI version](https://badge.fury.io/py/riszotto.svg)](https://badge.fury.io/py/riszotto)
+[![Spec-Driven Development](https://img.shields.io/badge/Spec--Driven_Development-blue)](https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/)
+[![Skills Enabled](https://img.shields.io/badge/Skills-Enabled-green)](https://agentskills.io/)
+
 CLI tool for searching, reading, and exporting papers from your local Zotero library.
 
 Requires Zotero desktop to be running with the local API enabled.
