@@ -68,7 +68,9 @@ def _get_collection(*, rebuild: bool = False):
     )
 
 
-def build_index(zot, *, rebuild: bool = False, limit: int | None = None) -> dict[str, int]:
+def build_index(
+    zot, *, rebuild: bool = False, limit: int | None = None
+) -> dict[str, int]:
     """Build or update the semantic search index.
 
     Fetches items from Zotero and upserts their text into ChromaDB.
@@ -83,7 +85,8 @@ def build_index(zot, *, rebuild: bool = False, limit: int | None = None) -> dict
 
     # Filter out child items
     top_level = [
-        item for item in items
+        item
+        for item in items
         if item.get("data", {}).get("itemType", "").lower() not in CHILD_ITEM_TYPES
     ]
 
@@ -115,13 +118,17 @@ def build_index(zot, *, rebuild: bool = False, limit: int | None = None) -> dict
 
         ids_to_upsert.append(key)
         docs_to_upsert.append(doc)
-        metas_to_upsert.append({
-            "title": data.get("title", ""),
-            "itemType": data.get("itemType", ""),
-        })
+        metas_to_upsert.append(
+            {
+                "title": data.get("title", ""),
+                "itemType": data.get("itemType", ""),
+            }
+        )
 
     # Batch upsert in groups of BATCH_SIZE
-    for i in tqdm(range(0, len(ids_to_upsert), BATCH_SIZE), desc="Upserting", unit="batch"):
+    for i in tqdm(
+        range(0, len(ids_to_upsert), BATCH_SIZE), desc="Upserting", unit="batch"
+    ):
         batch_end = i + BATCH_SIZE
         collection.upsert(
             ids=ids_to_upsert[i:batch_end],
@@ -152,12 +159,14 @@ def semantic_search(query: str, *, limit: int = 10) -> list[dict]:
     for i, key in enumerate(ids):
         score = round(1 - distances[i], 4)
         meta = metadatas[i] if i < len(metadatas) else {}
-        output.append({
-            "key": key,
-            "title": meta.get("title", ""),
-            "itemType": meta.get("itemType", ""),
-            "score": score,
-        })
+        output.append(
+            {
+                "key": key,
+                "title": meta.get("title", ""),
+                "itemType": meta.get("itemType", ""),
+                "score": score,
+            }
+        )
 
     return output
 

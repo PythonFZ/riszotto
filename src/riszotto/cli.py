@@ -29,6 +29,7 @@ def _import_semantic():
     """Import semantic module, returning None if extras not installed."""
     try:
         from riszotto import semantic
+
         return semantic
     except ImportError:
         return None
@@ -89,17 +90,56 @@ def _format_result(item: dict, max_value_size: int) -> dict:
 @app.command()
 def search(
     terms: Annotated[list[str], typer.Argument(help="Search terms")],
-    full_text: Annotated[bool, typer.Option("--full-text/--no-full-text", help="Search all fields including full-text")] = False,
-    semantic: Annotated[bool, typer.Option("--semantic", help="Use semantic similarity search")] = False,
-    limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 25,
-    page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed)")] = 1,
-    max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
-    tag: Annotated[Optional[list[str]], typer.Option("--tag", "-t", help="Filter by tag (repeatable, AND logic)")] = None,
-    item_type: Annotated[Optional[str], typer.Option("--item-type", help="Filter by item type (e.g. journalArticle, book)")] = None,
-    since: Annotated[Optional[str], typer.Option("--since", help="Only items modified after this date")] = None,
-    sort: Annotated[Optional[str], typer.Option("--sort", help="Sort field (e.g. dateModified, title, creator)")] = None,
-    direction: Annotated[Optional[str], typer.Option("--direction", help="Sort direction (asc or desc)")] = None,
-    author: Annotated[Optional[str], typer.Option("--author", help="Filter results by author name (case-insensitive substring match)")] = None,
+    full_text: Annotated[
+        bool,
+        typer.Option(
+            "--full-text/--no-full-text", help="Search all fields including full-text"
+        ),
+    ] = False,
+    semantic: Annotated[
+        bool, typer.Option("--semantic", help="Use semantic similarity search")
+    ] = False,
+    limit: Annotated[
+        int, typer.Option("--limit", "-l", help="Maximum number of results")
+    ] = 25,
+    page: Annotated[
+        int, typer.Option("--page", "-p", help="Page number (1-indexed)")
+    ] = 1,
+    max_value_size: Annotated[
+        int,
+        typer.Option(
+            "--max-value-size",
+            help="Hide string values longer than this (0 = show all)",
+        ),
+    ] = 200,
+    tag: Annotated[
+        Optional[list[str]],
+        typer.Option("--tag", "-t", help="Filter by tag (repeatable, AND logic)"),
+    ] = None,
+    item_type: Annotated[
+        Optional[str],
+        typer.Option(
+            "--item-type", help="Filter by item type (e.g. journalArticle, book)"
+        ),
+    ] = None,
+    since: Annotated[
+        Optional[str],
+        typer.Option("--since", help="Only items modified after this date"),
+    ] = None,
+    sort: Annotated[
+        Optional[str],
+        typer.Option("--sort", help="Sort field (e.g. dateModified, title, creator)"),
+    ] = None,
+    direction: Annotated[
+        Optional[str], typer.Option("--direction", help="Sort direction (asc or desc)")
+    ] = None,
+    author: Annotated[
+        Optional[str],
+        typer.Option(
+            "--author",
+            help="Filter results by author name (case-insensitive substring match)",
+        ),
+    ] = None,
 ) -> None:
     """Search for papers in your Zotero library."""
     query = " ".join(terms)
@@ -136,8 +176,16 @@ def search(
     start = (page - 1) * limit
     zot = _get_zot()
     results = search_items(
-        zot, query, full_text=full_text, limit=limit, start=start,
-        tag=tag, item_type=item_type, since=since, sort=sort, direction=direction,
+        zot,
+        query,
+        full_text=full_text,
+        limit=limit,
+        start=start,
+        tag=tag,
+        item_type=item_type,
+        since=since,
+        sort=sort,
+        direction=direction,
     )
 
     if author:
@@ -152,15 +200,24 @@ def search(
     typer.echo(json.dumps(envelope, indent=2))
 
 
-
 @app.command()
 def show(
     key: Annotated[str, typer.Argument(help="Zotero item key")],
-    attachment: Annotated[int, typer.Option("--attachment", "-a", help="PDF attachment index (1-indexed)")] = 1,
-    page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed, 0 = show all)")] = 1,
+    attachment: Annotated[
+        int, typer.Option("--attachment", "-a", help="PDF attachment index (1-indexed)")
+    ] = 1,
+    page: Annotated[
+        int, typer.Option("--page", "-p", help="Page number (1-indexed, 0 = show all)")
+    ] = 1,
     page_size: Annotated[int, typer.Option("--page-size", help="Lines per page")] = 500,
-    search: Annotated[Optional[str], typer.Option("--search", "-s", help="Show only lines matching all terms")] = None,
-    context: Annotated[int, typer.Option("--context", "-C", help="Context lines around each search match")] = 3,
+    search: Annotated[
+        Optional[str],
+        typer.Option("--search", "-s", help="Show only lines matching all terms"),
+    ] = None,
+    context: Annotated[
+        int,
+        typer.Option("--context", "-C", help="Context lines around each search match"),
+    ] = 3,
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
     zot = _get_zot()
@@ -171,7 +228,10 @@ def show(
         raise typer.Exit(1)
 
     if attachment < 1 or attachment > len(pdfs):
-        typer.echo(f"Attachment index {attachment} out of range. Item has {len(pdfs)} PDF(s).", err=True)
+        typer.echo(
+            f"Attachment index {attachment} out of range. Item has {len(pdfs)} PDF(s).",
+            err=True,
+        )
         raise typer.Exit(1)
 
     selected = pdfs[attachment - 1]
@@ -202,14 +262,25 @@ def show(
 @app.command()
 def export(
     key: Annotated[str, typer.Argument(help="Zotero item key")],
-    format: Annotated[str, typer.Option("--format", "-f", help="Export format")] = "bibtex",
-    exclude: Annotated[Optional[list[str]], typer.Option("--exclude", "-e", help="BibTeX fields to exclude (repeatable)")] = None,
-    include_all: Annotated[bool, typer.Option("--include-all", help="Don't exclude any fields")] = False,
+    format: Annotated[
+        str, typer.Option("--format", "-f", help="Export format")
+    ] = "bibtex",
+    exclude: Annotated[
+        Optional[list[str]],
+        typer.Option("--exclude", "-e", help="BibTeX fields to exclude (repeatable)"),
+    ] = None,
+    include_all: Annotated[
+        bool, typer.Option("--include-all", help="Don't exclude any fields")
+    ] = False,
 ) -> None:
     """Export an item in the specified format."""
     zot = _get_zot()
     if format == "bibtex":
-        excluded = set() if include_all else (set(exclude) if exclude else DEFAULT_BIBTEX_EXCLUDE)
+        excluded = (
+            set()
+            if include_all
+            else (set(exclude) if exclude else DEFAULT_BIBTEX_EXCLUDE)
+        )
         typer.echo(get_item_bibtex(zot, key, exclude=excluded))
     else:
         typer.echo(f"Unknown format: {format}", err=True)
@@ -227,7 +298,9 @@ def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
 
     total_pages = max(1, -(-total_lines // page_size))  # ceil division
     if page > total_pages:
-        typer.echo(f"Page {page} out of range. Document has {total_pages} page(s).", err=True)
+        typer.echo(
+            f"Page {page} out of range. Document has {total_pages} page(s).", err=True
+        )
         raise typer.Exit(1)
 
     start = (page - 1) * page_size
@@ -235,7 +308,9 @@ def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
     typer.echo("\n".join(lines[start:end]))
 
     if total_pages > 1:
-        typer.echo(f"\nPage {page}/{total_pages}. Next: riszotto show --page {page + 1} {key}")
+        typer.echo(
+            f"\nPage {page}/{total_pages}. Next: riszotto show --page {page + 1} {key}"
+        )
 
 
 def _grep_lines(markdown: str, terms: list[str], context: int = 3) -> str | None:
@@ -279,10 +354,22 @@ def _format_collection(col: dict) -> dict:
 
 @app.command()
 def collections(
-    key: Annotated[Optional[str], typer.Argument(help="Collection key (omit to list all)")] = None,
-    limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 25,
-    page: Annotated[int, typer.Option("--page", "-p", help="Page number (1-indexed)")] = 1,
-    max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
+    key: Annotated[
+        Optional[str], typer.Argument(help="Collection key (omit to list all)")
+    ] = None,
+    limit: Annotated[
+        int, typer.Option("--limit", "-l", help="Maximum number of results")
+    ] = 25,
+    page: Annotated[
+        int, typer.Option("--page", "-p", help="Page number (1-indexed)")
+    ] = 1,
+    max_value_size: Annotated[
+        int,
+        typer.Option(
+            "--max-value-size",
+            help="Hide string values longer than this (0 = show all)",
+        ),
+    ] = 200,
 ) -> None:
     """List collections or items in a collection."""
     zot = _get_zot()
@@ -305,8 +392,16 @@ def collections(
 
 @app.command()
 def recent(
-    limit: Annotated[int, typer.Option("--limit", "-l", help="Maximum number of results")] = 10,
-    max_value_size: Annotated[int, typer.Option("--max-value-size", help="Hide string values longer than this (0 = show all)")] = 200,
+    limit: Annotated[
+        int, typer.Option("--limit", "-l", help="Maximum number of results")
+    ] = 10,
+    max_value_size: Annotated[
+        int,
+        typer.Option(
+            "--max-value-size",
+            help="Hide string values longer than this (0 = show all)",
+        ),
+    ] = 200,
 ) -> None:
     """Show recently added papers."""
     zot = _get_zot()
@@ -320,9 +415,16 @@ def recent(
 
 @app.command()
 def index(
-    rebuild: Annotated[bool, typer.Option("--rebuild", help="Drop and rebuild the entire index")] = False,
-    status: Annotated[bool, typer.Option("--status", help="Show index statistics")] = False,
-    limit: Annotated[Optional[int], typer.Option("--limit", "-l", help="Maximum items to fetch from Zotero")] = None,
+    rebuild: Annotated[
+        bool, typer.Option("--rebuild", help="Drop and rebuild the entire index")
+    ] = False,
+    status: Annotated[
+        bool, typer.Option("--status", help="Show index statistics")
+    ] = False,
+    limit: Annotated[
+        Optional[int],
+        typer.Option("--limit", "-l", help="Maximum items to fetch from Zotero"),
+    ] = None,
 ) -> None:
     """Build or update the semantic search index."""
     semantic = _import_semantic()

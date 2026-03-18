@@ -15,8 +15,16 @@ class TestBuildDocumentText:
             "data": {
                 "title": "Attention Is All You Need",
                 "creators": [
-                    {"firstName": "Ashish", "lastName": "Vaswani", "creatorType": "author"},
-                    {"firstName": "Noam", "lastName": "Shazeer", "creatorType": "author"},
+                    {
+                        "firstName": "Ashish",
+                        "lastName": "Vaswani",
+                        "creatorType": "author",
+                    },
+                    {
+                        "firstName": "Noam",
+                        "lastName": "Shazeer",
+                        "creatorType": "author",
+                    },
                 ],
                 "abstractNote": "We propose a new architecture.",
                 "tags": [{"tag": "transformers"}, {"tag": "NLP"}],
@@ -44,7 +52,9 @@ class TestBuildDocumentText:
         item = {
             "data": {
                 "title": "Report",
-                "creators": [{"name": "World Health Organization", "creatorType": "author"}],
+                "creators": [
+                    {"name": "World Health Organization", "creatorType": "author"}
+                ],
             }
         }
         text = _build_document_text(item)

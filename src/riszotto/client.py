@@ -10,7 +10,14 @@ from pyzotero import zotero
 
 from riszotto.formatting import CHILD_ITEM_TYPES
 
-DEFAULT_BIBTEX_EXCLUDE: set[str] = {"file", "abstract", "note", "keywords", "urldate", "annote"}
+DEFAULT_BIBTEX_EXCLUDE: set[str] = {
+    "file",
+    "abstract",
+    "note",
+    "keywords",
+    "urldate",
+    "annote",
+}
 
 
 def get_client() -> zotero.Zotero:
@@ -38,7 +45,12 @@ def search_items(
 ) -> list[dict[str, Any]]:
     """Search the Zotero library, resolving child items to their parents."""
     qmode = "everything" if full_text else "titleCreatorYear"
-    kwargs: dict[str, Any] = {"q": query, "qmode": qmode, "limit": limit, "start": start}
+    kwargs: dict[str, Any] = {
+        "q": query,
+        "qmode": qmode,
+        "limit": limit,
+        "start": start,
+    }
     if tag is not None:
         kwargs["tag"] = tag if len(tag) > 1 else tag[0]
     if item_type is not None:
@@ -109,10 +121,14 @@ def recent_items(
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     """Get recently added items, excluding attachments."""
-    return zot.items(sort="dateAdded", direction="desc", limit=limit, itemType="-attachment")
+    return zot.items(
+        sort="dateAdded", direction="desc", limit=limit, itemType="-attachment"
+    )
 
 
-def get_item_bibtex(zot: zotero.Zotero, key: str, *, exclude: set[str] | None = None) -> str:
+def get_item_bibtex(
+    zot: zotero.Zotero, key: str, *, exclude: set[str] | None = None
+) -> str:
     """Get a single item's BibTeX entry, optionally stripping fields."""
     result = zot.item(key, format="bibtex")
     bibtex = result.decode("utf-8") if isinstance(result, bytes) else str(result)
