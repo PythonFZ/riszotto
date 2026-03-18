@@ -289,7 +289,7 @@ def show(
         typer.echo(output)
         return
 
-    _show_paginated(markdown, page, page_size, key)
+    _show_paginated(markdown, page, page_size, key, library=library)
 
 
 @app.command()
@@ -321,7 +321,14 @@ def export(
         raise typer.Exit(1)
 
 
-def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
+def _show_paginated(
+    markdown: str,
+    page: int,
+    page_size: int,
+    key: str,
+    *,
+    library: str | None = None,
+) -> None:
     """Print a page of markdown lines."""
     lines = markdown.splitlines()
     total_lines = len(lines)
@@ -342,8 +349,9 @@ def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
     typer.echo("\n".join(lines[start:end]))
 
     if total_pages > 1:
+        lib_flag = f' --library "{library}"' if library else ""
         typer.echo(
-            f"\nPage {page}/{total_pages}. Next: riszotto show --page {page + 1} {key}"
+            f"\nPage {page}/{total_pages}. Next: riszotto show{lib_flag} --page {page + 1} {key}"
         )
 
 
