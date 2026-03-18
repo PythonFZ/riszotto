@@ -222,7 +222,7 @@ class TestBuildIndex:
         result = build_index(mock_zot, rebuild=True)
         assert result["indexed"] == 2
         # rebuild=True is passed to _get_collection
-        mock_get_col.assert_called_once_with(rebuild=True)
+        mock_get_col.assert_called_once_with(rebuild=True, collection_name="user_0")
 
     @patch("riszotto.semantic._get_collection")
     def test_no_items_to_index(self, mock_get_col):
@@ -322,3 +322,89 @@ class TestGetIndexStatus:
         status = get_index_status()
         assert status["count"] == 0
         assert status["path"] == str(INDEX_DIR)
+
+
+class TestCollectionNaming:
+    @patch("riszotto.semantic._get_collection")
+    def test_build_index_uses_collection_name(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 0
+
+        mock_zot = MagicMock()
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = []
+
+        build_index(mock_zot, collection_name="group_999")
+        mock_get_col.assert_called_once_with(
+            rebuild=False, collection_name="group_999"
+        )
+
+    @patch("riszotto.semantic._get_collection")
+    def test_semantic_search_uses_collection_name(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 0
+
+        semantic_search("query", collection_name="group_999")
+        mock_get_col.assert_called_once_with(collection_name="group_999")
+
+    @patch("riszotto.semantic._get_collection")
+    def test_get_index_status_uses_collection_name(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 5
+
+        get_index_status(collection_name="group_999")
+        mock_get_col.assert_called_once_with(collection_name="group_999")
+
+    @patch("riszotto.semantic._get_collection")
+    def test_default_collection_name_is_user_0(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 0
+
+        mock_zot = MagicMock()
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = []
+
+        build_index(mock_zot)
+        mock_get_col.assert_called_once_with(
+            rebuild=False, collection_name="user_0"
+        )
+
+
+class TestMigration:
+    def test_migrates_zotero_to_user_0(self):
+        """Old 'zotero' collection is renamed to 'user_0' on first access."""
+        from riszotto.semantic import _maybe_migrate
+
+        mock_client = MagicMock()
+        old_collection = MagicMock()
+        mock_client.get_collection.return_value = old_collection
+
+        _maybe_migrate(mock_client, "user_0")
+
+        mock_client.get_collection.assert_called_once_with(name="zotero")
+        old_collection.modify.assert_called_once_with(name="user_0")
+
+    def test_no_migration_for_group_collections(self):
+        """Migration only runs when target is 'user_0'."""
+        from riszotto.semantic import _maybe_migrate
+
+        mock_client = MagicMock()
+
+        _maybe_migrate(mock_client, "group_123")
+
+        mock_client.get_collection.assert_not_called()
+
+    def test_no_migration_when_no_legacy_collection(self):
+        """Migration is a no-op when 'zotero' collection doesn't exist."""
+        from riszotto.semantic import _maybe_migrate
+
+        mock_client = MagicMock()
+        mock_client.get_collection.side_effect = ValueError("not found")
+
+        _maybe_migrate(mock_client, "user_0")
+
+        mock_client.get_collection.assert_called_once_with(name="zotero")
