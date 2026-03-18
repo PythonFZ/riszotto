@@ -1013,9 +1013,10 @@ class TestIndex:
 
 
 class TestLibraries:
+    @patch("riszotto.cli.zotero.Zotero")
     @patch("riszotto.cli.load_config")
     @patch("riszotto.cli.get_client")
-    def test_lists_local_groups(self, mock_get_client, mock_config):
+    def test_lists_local_groups(self, mock_get_client, mock_config, mock_zotero_cls):
         from riszotto.config import Config
 
         mock_config.return_value = Config()
@@ -1025,6 +1026,9 @@ class TestLibraries:
             {"id": 111, "data": {"name": "Lab Group"}},
             {"id": 222, "data": {"name": "Dept. Reading"}},
         ]
+        mock_group_zot = MagicMock()
+        mock_group_zot.num_items.return_value = 5
+        mock_zotero_cls.return_value = mock_group_zot
 
         result = runner.invoke(app, ["libraries"])
         assert result.exit_code == 0
