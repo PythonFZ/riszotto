@@ -22,8 +22,16 @@ class TestSearch:
                     "date": "2017-06-12",
                     "abstractNote": "We propose a new architecture.",
                     "creators": [
-                        {"firstName": "Ashish", "lastName": "Vaswani", "creatorType": "author"},
-                        {"firstName": "Noam", "lastName": "Shazeer", "creatorType": "author"},
+                        {
+                            "firstName": "Ashish",
+                            "lastName": "Vaswani",
+                            "creatorType": "author",
+                        },
+                        {
+                            "firstName": "Noam",
+                            "lastName": "Shazeer",
+                            "creatorType": "author",
+                        },
                     ],
                     "tags": [{"tag": "transformers"}, {"tag": "NLP"}],
                 },
@@ -62,7 +70,9 @@ class TestSearch:
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = []
         runner.invoke(app, ["search", "--full-text", "deep learning"])
-        mock_zot.items.assert_called_once_with(q="deep learning", qmode="everything", limit=25, start=0)
+        mock_zot.items.assert_called_once_with(
+            q="deep learning", qmode="everything", limit=25, start=0
+        )
 
     @patch("riszotto.cli.get_client")
     def test_search_limit_flag(self, mock_get_client):
@@ -70,7 +80,9 @@ class TestSearch:
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = []
         runner.invoke(app, ["search", "--limit", "5", "test"])
-        mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=5, start=0)
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=5, start=0
+        )
 
     @patch("riszotto.cli.get_client")
     def test_search_zotero_not_running(self, mock_get_client):
@@ -85,7 +97,9 @@ class TestSearch:
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = []
         runner.invoke(app, ["search", "--page", "3", "test"])
-        mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=25, start=50)
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=25, start=50
+        )
 
     @patch("riszotto.cli.get_client")
     def test_search_page_in_envelope(self, mock_get_client):
@@ -202,7 +216,9 @@ class TestSearch:
     def test_search_sort_flags(self, mock_get_client, mock_search_items):
         mock_get_client.return_value = MagicMock()
         mock_search_items.return_value = []
-        runner.invoke(app, ["search", "--sort", "dateModified", "--direction", "asc", "test"])
+        runner.invoke(
+            app, ["search", "--sort", "dateModified", "--direction", "asc", "test"]
+        )
         _, kwargs = mock_search_items.call_args
         assert kwargs["sort"] == "dateModified"
         assert kwargs["direction"] == "asc"
@@ -214,16 +230,36 @@ class TestSearch:
         mock_zot.items.return_value = [
             {
                 "data": {
-                    "key": "K1", "title": "Paper A", "itemType": "journalArticle",
-                    "date": "2024", "abstractNote": "", "tags": [],
-                    "creators": [{"firstName": "Alice", "lastName": "Smith", "creatorType": "author"}],
+                    "key": "K1",
+                    "title": "Paper A",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": "",
+                    "tags": [],
+                    "creators": [
+                        {
+                            "firstName": "Alice",
+                            "lastName": "Smith",
+                            "creatorType": "author",
+                        }
+                    ],
                 },
             },
             {
                 "data": {
-                    "key": "K2", "title": "Paper B", "itemType": "journalArticle",
-                    "date": "2024", "abstractNote": "", "tags": [],
-                    "creators": [{"firstName": "Bob", "lastName": "Jones", "creatorType": "author"}],
+                    "key": "K2",
+                    "title": "Paper B",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": "",
+                    "tags": [],
+                    "creators": [
+                        {
+                            "firstName": "Bob",
+                            "lastName": "Jones",
+                            "creatorType": "author",
+                        }
+                    ],
                 },
             },
         ]
@@ -237,26 +273,43 @@ class TestSearch:
 class TestSearchSemantic:
     @patch("riszotto.cli.get_client")
     @patch("riszotto.cli._import_semantic")
-    def test_semantic_search_outputs_envelope(self, mock_import_semantic, mock_get_client):
+    def test_semantic_search_outputs_envelope(
+        self, mock_import_semantic, mock_get_client
+    ):
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
         mock_semantic.semantic_search.return_value = [
-            {"key": "P1", "title": "Paper One", "itemType": "journalArticle", "score": 0.95},
+            {
+                "key": "P1",
+                "title": "Paper One",
+                "itemType": "journalArticle",
+                "score": 0.95,
+            },
             {"key": "P2", "title": "Paper Two", "itemType": "book", "score": 0.80},
         ]
         mock_zot.item.side_effect = lambda key: {
             "P1": {
                 "data": {
-                    "key": "P1", "title": "Paper One", "itemType": "journalArticle",
-                    "date": "2024", "abstractNote": "Abstract 1.", "creators": [], "tags": [],
+                    "key": "P1",
+                    "title": "Paper One",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": "Abstract 1.",
+                    "creators": [],
+                    "tags": [],
                 },
             },
             "P2": {
                 "data": {
-                    "key": "P2", "title": "Paper Two", "itemType": "book",
-                    "date": "2023", "abstractNote": "Abstract 2.", "creators": [], "tags": [],
+                    "key": "P2",
+                    "title": "Paper Two",
+                    "itemType": "book",
+                    "date": "2023",
+                    "abstractNote": "Abstract 2.",
+                    "creators": [],
+                    "tags": [],
                 },
             },
         }[key]
@@ -294,33 +347,62 @@ class TestSearchSemantic:
 
     @patch("riszotto.cli.get_client")
     @patch("riszotto.cli._import_semantic")
-    def test_semantic_search_author_filters(self, mock_import_semantic, mock_get_client):
+    def test_semantic_search_author_filters(
+        self, mock_import_semantic, mock_get_client
+    ):
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
         mock_semantic.semantic_search.return_value = [
-            {"key": "P1", "title": "Paper One", "itemType": "journalArticle", "score": 0.95},
+            {
+                "key": "P1",
+                "title": "Paper One",
+                "itemType": "journalArticle",
+                "score": 0.95,
+            },
             {"key": "P2", "title": "Paper Two", "itemType": "book", "score": 0.80},
         ]
         mock_zot.item.side_effect = lambda key: {
             "P1": {
                 "data": {
-                    "key": "P1", "title": "Paper One", "itemType": "journalArticle",
-                    "date": "2024", "abstractNote": "", "tags": [],
-                    "creators": [{"firstName": "Alice", "lastName": "Smith", "creatorType": "author"}],
+                    "key": "P1",
+                    "title": "Paper One",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "abstractNote": "",
+                    "tags": [],
+                    "creators": [
+                        {
+                            "firstName": "Alice",
+                            "lastName": "Smith",
+                            "creatorType": "author",
+                        }
+                    ],
                 },
             },
             "P2": {
                 "data": {
-                    "key": "P2", "title": "Paper Two", "itemType": "book",
-                    "date": "2023", "abstractNote": "", "tags": [],
-                    "creators": [{"firstName": "Bob", "lastName": "Jones", "creatorType": "author"}],
+                    "key": "P2",
+                    "title": "Paper Two",
+                    "itemType": "book",
+                    "date": "2023",
+                    "abstractNote": "",
+                    "tags": [],
+                    "creators": [
+                        {
+                            "firstName": "Bob",
+                            "lastName": "Jones",
+                            "creatorType": "author",
+                        }
+                    ],
                 },
             },
         }[key]
 
-        result = runner.invoke(app, ["search", "--semantic", "--author", "jones", "test"])
+        result = runner.invoke(
+            app, ["search", "--semantic", "--author", "jones", "test"]
+        )
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert len(parsed["results"]) == 1
@@ -328,7 +410,9 @@ class TestSearchSemantic:
 
     @patch("riszotto.cli.get_client")
     @patch("riszotto.cli._import_semantic")
-    def test_semantic_search_respects_limit(self, mock_import_semantic, mock_get_client):
+    def test_semantic_search_respects_limit(
+        self, mock_import_semantic, mock_get_client
+    ):
         mock_get_client.return_value = MagicMock()
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
@@ -355,8 +439,17 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
-                "links": {"enclosure": {"href": "file:///Users/me/Zotero/storage/ATT1/paper.pdf"}},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {
+                    "enclosure": {
+                        "href": "file:///Users/me/Zotero/storage/ATT1/paper.pdf"
+                    }
+                },
             }
         ]
         mock_md = MagicMock()
@@ -368,7 +461,9 @@ class TestShow:
         result = runner.invoke(app, ["show", "PARENT1"])
         assert result.exit_code == 0
         assert "# Paper Title" in result.output
-        mock_md.convert.assert_called_once_with("/Users/me/Zotero/storage/ATT1/paper.pdf")
+        mock_md.convert.assert_called_once_with(
+            "/Users/me/Zotero/storage/ATT1/paper.pdf"
+        )
 
     @patch("riszotto.cli.get_client")
     def test_show_no_pdf_attachment(self, mock_get_client):
@@ -388,11 +483,21 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper1.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper1.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper1.pdf"}},
             },
             {
-                "data": {"key": "ATT2", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper2.pdf"},
+                "data": {
+                    "key": "ATT2",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper2.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper2.pdf"}},
             },
         ]
@@ -413,7 +518,12 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
@@ -438,7 +548,12 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
@@ -448,7 +563,9 @@ class TestShow:
         mock_result.markdown = "\n".join(f"Line {i}" for i in range(1, 11))
         mock_md.convert.return_value = mock_result
 
-        result = runner.invoke(app, ["show", "--page", "2", "--page-size", "5", "PARENT1"])
+        result = runner.invoke(
+            app, ["show", "--page", "2", "--page-size", "5", "PARENT1"]
+        )
         assert result.exit_code == 0
         assert "Line 6" in result.output
         assert "Line 10" in result.output
@@ -461,7 +578,12 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
@@ -471,7 +593,9 @@ class TestShow:
         mock_result.markdown = "\n".join(f"Line {i}" for i in range(1, 11))
         mock_md.convert.return_value = mock_result
 
-        result = runner.invoke(app, ["show", "--page", "0", "--page-size", "5", "PARENT1"])
+        result = runner.invoke(
+            app, ["show", "--page", "0", "--page-size", "5", "PARENT1"]
+        )
         assert result.exit_code == 0
         assert "Line 1" in result.output
         assert "Line 10" in result.output
@@ -483,7 +607,12 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
@@ -493,7 +622,9 @@ class TestShow:
         mock_result.markdown = "Short doc"
         mock_md.convert.return_value = mock_result
 
-        result = runner.invoke(app, ["show", "--page", "99", "--page-size", "5", "PARENT1"])
+        result = runner.invoke(
+            app, ["show", "--page", "99", "--page-size", "5", "PARENT1"]
+        )
         assert result.exit_code == 1
         assert "out of range" in result.output.lower()
 
@@ -504,7 +635,12 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
@@ -518,7 +654,9 @@ class TestShow:
         mock_result.markdown = "\n".join(lines)
         mock_md.convert.return_value = mock_result
 
-        result = runner.invoke(app, ["show", "--search", "regression", "-C", "1", "PARENT1"])
+        result = runner.invoke(
+            app, ["show", "--search", "regression", "-C", "1", "PARENT1"]
+        )
         assert result.exit_code == 0
         assert "This paper studies regression." in result.output
         assert "filler line 19" in result.output  # 1 line before
@@ -532,14 +670,21 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
         mock_md = MagicMock()
         mock_markitdown_cls.return_value = mock_md
         mock_result = MagicMock()
-        mock_result.markdown = "# Introduction\n\nSome content.\n\n## Methods\n\nMore content."
+        mock_result.markdown = (
+            "# Introduction\n\nSome content.\n\n## Methods\n\nMore content."
+        )
         mock_md.convert.return_value = mock_result
 
         result = runner.invoke(app, ["show", "--search", "nonexistent", "PARENT1"])
@@ -553,7 +698,12 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
@@ -570,7 +720,9 @@ class TestShow:
         )
         mock_md.convert.return_value = mock_result
 
-        result = runner.invoke(app, ["show", "--search", "DFT BMIM", "-C", "0", "PARENT1"])
+        result = runner.invoke(
+            app, ["show", "--search", "DFT BMIM", "-C", "0", "PARENT1"]
+        )
         assert result.exit_code == 0
         # Lines containing BOTH terms match
         assert "DFT and BMIM were studied." in result.output
@@ -586,7 +738,12 @@ class TestShow:
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
@@ -602,12 +759,19 @@ class TestShow:
 
     @patch("riszotto.cli.MarkItDown")
     @patch("riszotto.cli.get_client")
-    def test_show_search_separator_between_blocks(self, mock_get_client, mock_markitdown_cls):
+    def test_show_search_separator_between_blocks(
+        self, mock_get_client, mock_markitdown_cls
+    ):
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
@@ -637,7 +801,10 @@ class TestExport:
         assert result.exit_code == 0
         assert "@article{doe2024, title={Test Paper}}" in result.output
         from riszotto.client import DEFAULT_BIBTEX_EXCLUDE
-        mock_get_bibtex.assert_called_once_with(mock_zot, "ABC123", exclude=DEFAULT_BIBTEX_EXCLUDE)
+
+        mock_get_bibtex.assert_called_once_with(
+            mock_zot, "ABC123", exclude=DEFAULT_BIBTEX_EXCLUDE
+        )
 
     @patch("riszotto.cli.get_item_bibtex")
     @patch("riszotto.cli.get_client")
@@ -657,9 +824,13 @@ class TestExport:
         mock_get_client.return_value = mock_zot
         mock_get_bibtex.return_value = "@article{doe2024, title={Test}}"
 
-        result = runner.invoke(app, ["export", "ABC123", "--exclude", "file", "--exclude", "note"])
+        result = runner.invoke(
+            app, ["export", "ABC123", "--exclude", "file", "--exclude", "note"]
+        )
         assert result.exit_code == 0
-        mock_get_bibtex.assert_called_once_with(mock_zot, "ABC123", exclude={"file", "note"})
+        mock_get_bibtex.assert_called_once_with(
+            mock_zot, "ABC123", exclude={"file", "note"}
+        )
 
     @patch("riszotto.cli.get_client")
     def test_export_unknown_format(self, mock_get_client):
@@ -718,7 +889,9 @@ class TestCollections:
     def test_collection_items_pagination(self, mock_get_client, mock_collection_items):
         mock_get_client.return_value = MagicMock()
         mock_collection_items.return_value = []
-        result = runner.invoke(app, ["collections", "COL1", "--page", "3", "--limit", "10"])
+        result = runner.invoke(
+            app, ["collections", "COL1", "--page", "3", "--limit", "10"]
+        )
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["page"] == 3
@@ -788,7 +961,9 @@ class TestIndex:
         result = runner.invoke(app, ["index"])
         assert result.exit_code == 0
         assert "10" in result.output
-        mock_semantic.build_index.assert_called_once_with(mock_zot, rebuild=False, limit=None)
+        mock_semantic.build_index.assert_called_once_with(
+            mock_zot, rebuild=False, limit=None
+        )
 
     @patch("riszotto.cli.get_client")
     @patch("riszotto.cli._import_semantic")
@@ -801,7 +976,9 @@ class TestIndex:
 
         result = runner.invoke(app, ["index", "--rebuild"])
         assert result.exit_code == 0
-        mock_semantic.build_index.assert_called_once_with(mock_zot, rebuild=True, limit=None)
+        mock_semantic.build_index.assert_called_once_with(
+            mock_zot, rebuild=True, limit=None
+        )
 
     @patch("riszotto.cli.get_client")
     @patch("riszotto.cli._import_semantic")
@@ -809,7 +986,10 @@ class TestIndex:
         mock_get_client.return_value = MagicMock()
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
-        mock_semantic.get_index_status.return_value = {"count": 42, "path": "/home/user/.riszotto/chroma_db"}
+        mock_semantic.get_index_status.return_value = {
+            "count": 42,
+            "path": "/home/user/.riszotto/chroma_db",
+        }
 
         result = runner.invoke(app, ["index", "--status"])
         assert result.exit_code == 0
@@ -824,5 +1004,3 @@ class TestIndex:
         result = runner.invoke(app, ["index"])
         assert result.exit_code == 1
         assert "semantic" in result.output.lower()
-
-

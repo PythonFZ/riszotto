@@ -18,7 +18,7 @@ from riszotto.client import (
 class TestGetClient:
     def test_returns_zotero_instance(self):
         with patch("riszotto.client.zotero.Zotero") as mock_zotero:
-            client = get_client()
+            get_client()
             mock_zotero.assert_called_once_with(
                 library_id="0",
                 library_type="user",
@@ -36,13 +36,21 @@ class TestSearchItems:
                     "key": "ABC123",
                     "title": "Test Paper",
                     "date": "2024-01-15",
-                    "creators": [{"firstName": "John", "lastName": "Doe", "creatorType": "author"}],
+                    "creators": [
+                        {
+                            "firstName": "John",
+                            "lastName": "Doe",
+                            "creatorType": "author",
+                        }
+                    ],
                 },
                 "meta": {"creatorSummary": "Doe et al."},
             }
         ]
         results = search_items(mock_zot, "test query", full_text=False, limit=25)
-        mock_zot.items.assert_called_once_with(q="test query", qmode="titleCreatorYear", limit=25, start=0)
+        mock_zot.items.assert_called_once_with(
+            q="test query", qmode="titleCreatorYear", limit=25, start=0
+        )
         assert len(results) == 1
         assert results[0]["data"]["key"] == "ABC123"
 
@@ -50,31 +58,55 @@ class TestSearchItems:
         mock_zot = MagicMock()
         mock_zot.items.return_value = []
         search_items(mock_zot, "test query", full_text=True, limit=10)
-        mock_zot.items.assert_called_once_with(q="test query", qmode="everything", limit=10, start=0)
+        mock_zot.items.assert_called_once_with(
+            q="test query", qmode="everything", limit=10, start=0
+        )
 
     def test_search_with_start_offset(self):
         mock_zot = MagicMock()
         mock_zot.items.return_value = []
         search_items(mock_zot, "test", full_text=False, limit=25, start=50)
-        mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=25, start=50)
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=25, start=50
+        )
 
     def test_search_default_start_is_zero(self):
         mock_zot = MagicMock()
         mock_zot.items.return_value = []
         search_items(mock_zot, "test", full_text=False, limit=25)
-        mock_zot.items.assert_called_once_with(q="test", qmode="titleCreatorYear", limit=25, start=0)
+        mock_zot.items.assert_called_once_with(
+            q="test", qmode="titleCreatorYear", limit=25, start=0
+        )
 
     def test_search_resolves_attachments_to_parents(self):
         mock_zot = MagicMock()
         mock_zot.items.return_value = [
             {"data": {"key": "ATT1", "itemType": "attachment", "parentItem": "PAPER1"}},
-            {"data": {"key": "PAPER2", "itemType": "journalArticle", "title": "Direct Hit"}},
+            {
+                "data": {
+                    "key": "PAPER2",
+                    "itemType": "journalArticle",
+                    "title": "Direct Hit",
+                }
+            },
             {"data": {"key": "ATT2", "itemType": "attachment", "parentItem": "PAPER1"}},
             {"data": {"key": "NOTE1", "itemType": "note", "parentItem": "PAPER3"}},
         ]
         mock_zot.item.side_effect = lambda key: {
-            "PAPER1": {"data": {"key": "PAPER1", "itemType": "journalArticle", "title": "Resolved Paper"}},
-            "PAPER3": {"data": {"key": "PAPER3", "itemType": "journalArticle", "title": "From Note"}},
+            "PAPER1": {
+                "data": {
+                    "key": "PAPER1",
+                    "itemType": "journalArticle",
+                    "title": "Resolved Paper",
+                }
+            },
+            "PAPER3": {
+                "data": {
+                    "key": "PAPER3",
+                    "itemType": "journalArticle",
+                    "title": "From Note",
+                }
+            },
         }[key]
 
         results = search_items(mock_zot, "test", full_text=True, limit=25)
@@ -132,9 +164,21 @@ class TestSearchItems:
     def test_search_with_sort(self):
         mock_zot = MagicMock()
         mock_zot.items.return_value = []
-        search_items(mock_zot, "test", full_text=False, limit=25, sort="dateModified", direction="asc")
+        search_items(
+            mock_zot,
+            "test",
+            full_text=False,
+            limit=25,
+            sort="dateModified",
+            direction="asc",
+        )
         mock_zot.items.assert_called_once_with(
-            q="test", qmode="titleCreatorYear", limit=25, start=0, sort="dateModified", direction="asc"
+            q="test",
+            qmode="titleCreatorYear",
+            limit=25,
+            start=0,
+            sort="dateModified",
+            direction="asc",
         )
 
 
@@ -152,7 +196,12 @@ class TestGetPdfAttachments:
         mock_zot = MagicMock()
         mock_zot.children.return_value = [
             {
-                "data": {"key": "ATT1", "itemType": "attachment", "contentType": "application/pdf", "filename": "paper.pdf"},
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             },
             {
@@ -329,12 +378,7 @@ class TestFilterBibtexFields:
         assert "annote" in DEFAULT_BIBTEX_EXCLUDE
 
     def test_no_trailing_comma_before_closing_brace(self):
-        bibtex = (
-            "@article{doe2024,\n"
-            "  title = {Test},\n"
-            "  file = {/path.pdf}\n"
-            "}"
-        )
+        bibtex = "@article{doe2024,\n  title = {Test},\n  file = {/path.pdf}\n}"
         result = _filter_bibtex_fields(bibtex, {"file"})
         assert ",\n}" not in result
 
