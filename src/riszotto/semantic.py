@@ -42,16 +42,6 @@ def _build_document_text(item: dict) -> str:
     return " ".join(parts)
 
 
-def _maybe_migrate(client, target_name: str) -> None:
-    """Rename legacy 'zotero' collection to 'user_0' if needed."""
-    if target_name != "user_0":
-        return
-    try:
-        old = client.get_collection(name="zotero")
-        old.modify(name="user_0")
-    except ValueError:
-        pass  # no legacy collection
-
 
 def _get_collection(*, rebuild: bool = False, collection_name: str = "user_0"):
     """Get or create a ChromaDB collection by name.
@@ -66,8 +56,6 @@ def _get_collection(*, rebuild: bool = False, collection_name: str = "user_0"):
         path=str(INDEX_DIR),
         settings=Settings(anonymized_telemetry=False, allow_reset=True),
     )
-
-    _maybe_migrate(client, collection_name)
 
     if rebuild:
         try:
