@@ -178,6 +178,14 @@ def search(
 
         zot = _get_zot(library=library)
         col = _collection_name(zot, library)
+        status = sem.get_index_status(collection_name=col)
+        if status["count"] == 0:
+            lib_hint = f' --library "{library}"' if library else ""
+            typer.echo(
+                f"No semantic index found. Build one first: riszotto index{lib_hint}",
+                err=True,
+            )
+            raise typer.Exit(1)
         hits = sem.semantic_search(query, limit=limit, collection_name=col)
         results = []
         for hit in hits:
