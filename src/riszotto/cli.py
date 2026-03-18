@@ -510,14 +510,22 @@ def index(
 def libraries() -> None:
     """List available Zotero libraries."""
     config = load_config()
-    libs: list[dict[str, str]] = [
-        {"name": "My Library", "id": "0", "type": "user", "source": "local"},
-    ]
+    libs: list[dict] = []
     seen_ids: set[int] = set()
 
     # Try local groups
     try:
         local_zot = get_client()
+        num_personal = local_zot.num_items()
+        libs.append(
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "items": num_personal,
+            }
+        )
         for group in local_zot.groups():
             seen_ids.add(group["id"])
             libs.append(
@@ -526,10 +534,19 @@ def libraries() -> None:
                     "id": str(group["id"]),
                     "type": "group",
                     "source": "local",
+                    "items": group.get("meta", {}).get("numItems", "?"),
                 }
             )
     except Exception:
-        pass
+        libs.append(
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "items": "?",
+            }
+        )
 
     # Try remote groups
     if config.has_remote_credentials:
@@ -547,16 +564,17 @@ def libraries() -> None:
                             "id": str(group["id"]),
                             "type": "group",
                             "source": "remote",
+                            "items": group.get("meta", {}).get("numItems", "?"),
                         }
                     )
         except Exception:
             pass
 
     # Format as markdown table
-    header = f"{'Name':<30} {'ID':<10} {'Type':<8} {'Source'}"
+    header = f"{'Name':<30} {'ID':<10} {'Type':<8} {'Items':<8} {'Source'}"
     lines = [header, "-" * len(header)]
     for lib in libs:
         lines.append(
-            f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {lib['source']}"
+            f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {str(lib['items']):<8} {lib['source']}"
         )
     typer.echo("\n".join(lines))
