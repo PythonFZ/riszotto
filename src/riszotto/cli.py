@@ -274,9 +274,15 @@ def show(
         raise typer.Exit(1)
 
     try:
-        md = MarkItDown()
-        result = md.convert(file_path)
-        markdown = result.markdown
+        import logging
+
+        logging.disable(logging.CRITICAL)
+        try:
+            md = MarkItDown()
+            result = md.convert(file_path)
+            markdown = result.markdown
+        finally:
+            logging.disable(logging.NOTSET)
     except Exception as e:
         typer.echo(f"Failed to convert PDF to markdown: {e}", err=True)
         raise typer.Exit(1)
