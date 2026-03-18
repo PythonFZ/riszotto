@@ -120,7 +120,7 @@ def build_index(
     metas_to_upsert: list[dict] = []
     skipped = 0
 
-    for item in tqdm(top_level, desc="Processing items", unit="item"):
+    for item in top_level:
         data = item.get("data", {})
         key = data.get("key", "")
 
