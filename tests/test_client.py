@@ -1,9 +1,14 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
+    AmbiguousLibraryError,
+    LibraryNotFoundError,
     _filter_bibtex_fields,
     collection_items,
+    find_group,
     get_client,
     get_item,
     get_item_bibtex,
@@ -13,6 +18,7 @@ from riszotto.client import (
     recent_items,
     search_items,
 )
+from riszotto.config import Config
 
 
 class TestGetClient:
@@ -399,3 +405,133 @@ class TestGetPdfPath:
         attachment = {"links": {}}
         path = get_pdf_path(attachment)
         assert path is None
+
+
+SAMPLE_GROUPS = [
+    {"id": 111, "data": {"name": "Lab Group"}},
+    {"id": 222, "data": {"name": "Dept. Reading"}},
+    {"id": 333, "data": {"name": "Lab"}},
+]
+
+
+class TestFindGroup:
+    def test_exact_name_match_case_insensitive(self):
+        result = find_group(SAMPLE_GROUPS, "lab group")
+        assert result["id"] == 111
+
+    def test_exact_match_preferred_over_substring(self):
+        result = find_group(SAMPLE_GROUPS, "Lab")
+        assert result["id"] == 333
+
+    def test_substring_match_single(self):
+        result = find_group(SAMPLE_GROUPS, "Reading")
+        assert result["id"] == 222
+
+    def test_substring_match_ambiguous_raises(self):
+        groups = [
+            {"id": 1, "data": {"name": "Physics Lab"}},
+            {"id": 2, "data": {"name": "Chemistry Lab"}},
+        ]
+        with pytest.raises(AmbiguousLibraryError, match="Physics Lab"):
+            find_group(groups, "Lab")
+
+    def test_numeric_id_match(self):
+        result = find_group(SAMPLE_GROUPS, "222")
+        assert result["id"] == 222
+
+    def test_no_match_returns_none(self):
+        result = find_group(SAMPLE_GROUPS, "Nonexistent")
+        assert result is None
+
+    def test_empty_groups_returns_none(self):
+        result = find_group([], "anything")
+        assert result is None
+
+
+class TestLibraryNotFoundError:
+    def test_is_exception(self):
+        with pytest.raises(LibraryNotFoundError):
+            raise LibraryNotFoundError("not found")
+
+
+class TestGetClientWithLibrary:
+    @patch("riszotto.client.zotero.Zotero")
+    def test_no_library_returns_local_user(self, mock_zotero):
+        get_client()
+        mock_zotero.assert_called_once_with(
+            library_id="0",
+            library_type="user",
+            api_key=None,
+            local=True,
+        )
+
+    @patch("riszotto.client.load_config", return_value=Config())
+    @patch("riszotto.client.zotero.Zotero")
+    def test_library_found_locally(self, mock_zotero, mock_config):
+        mock_local = MagicMock()
+        mock_local.groups.return_value = [
+            {"id": 111, "data": {"name": "Lab Group"}},
+        ]
+        mock_zotero.return_value = mock_local
+
+        get_client(library="Lab Group")
+
+        assert mock_zotero.call_count == 2
+        mock_zotero.assert_any_call(
+            library_id="111",
+            library_type="group",
+            local=True,
+        )
+
+    @patch(
+        "riszotto.client.load_config",
+        return_value=Config(api_key="k", user_id="u"),
+    )
+    @patch("riszotto.client.zotero.Zotero")
+    def test_library_fallback_to_remote(self, mock_zotero, mock_config):
+        mock_local = MagicMock()
+        mock_local.groups.side_effect = ConnectionError("refused")
+
+        mock_remote = MagicMock()
+        mock_remote.groups.return_value = [
+            {"id": 999, "data": {"name": "Remote Group"}},
+        ]
+
+        mock_zotero.side_effect = [mock_local, mock_remote, MagicMock()]
+
+        get_client(library="Remote Group")
+
+        mock_zotero.assert_any_call(
+            library_id="999",
+            library_type="group",
+            api_key="k",
+        )
+
+    @patch("riszotto.client.load_config", return_value=Config())
+    @patch("riszotto.client.zotero.Zotero")
+    def test_library_not_found_no_remote_config(self, mock_zotero, mock_config):
+        mock_local = MagicMock()
+        mock_local.groups.return_value = []
+        mock_zotero.return_value = mock_local
+
+        with pytest.raises(LibraryNotFoundError, match="config"):
+            get_client(library="Nonexistent")
+
+    @patch(
+        "riszotto.client.load_config",
+        return_value=Config(api_key="k", user_id="u"),
+    )
+    @patch("riszotto.client.zotero.Zotero")
+    def test_library_not_found_anywhere(self, mock_zotero, mock_config):
+        mock_local = MagicMock()
+        mock_local.groups.return_value = []
+
+        mock_remote = MagicMock()
+        mock_remote.groups.return_value = [
+            {"id": 1, "data": {"name": "Other Group"}},
+        ]
+
+        mock_zotero.side_effect = [mock_local, mock_remote]
+
+        with pytest.raises(LibraryNotFoundError, match="Other Group"):
+            get_client(library="Nonexistent")
