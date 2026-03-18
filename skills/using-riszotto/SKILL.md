@@ -48,7 +48,6 @@ uvx riszotto search -L "My Group" "neural networks"  # search a group
 uvx riszotto index -L "My Group"                     # build semantic index for group
 ```
 
-For groups not synced locally, configure `~/.riszotto/config.toml` with `api_key` and `user_id` from zotero.org/settings/keys.
 
 ## Common Workflows
 
