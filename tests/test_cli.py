@@ -419,7 +419,9 @@ class TestSearchSemantic:
         mock_semantic.semantic_search.return_value = []
 
         runner.invoke(app, ["search", "--semantic", "--limit", "5", "test"])
-        mock_semantic.semantic_search.assert_called_once_with("test", limit=5)
+        mock_semantic.semantic_search.assert_called_once_with(
+            "test", limit=5, collection_name="user_0"
+        )
 
 
 class TestConnectionError:
@@ -962,7 +964,7 @@ class TestIndex:
         assert result.exit_code == 0
         assert "10" in result.output
         mock_semantic.build_index.assert_called_once_with(
-            mock_zot, rebuild=False, limit=None
+            mock_zot, rebuild=False, limit=None, collection_name="user_0"
         )
 
     @patch("riszotto.cli.get_client")
@@ -977,7 +979,7 @@ class TestIndex:
         result = runner.invoke(app, ["index", "--rebuild"])
         assert result.exit_code == 0
         mock_semantic.build_index.assert_called_once_with(
-            mock_zot, rebuild=True, limit=None
+            mock_zot, rebuild=True, limit=None, collection_name="user_0"
         )
 
     @patch("riszotto.cli.get_client")
@@ -1004,3 +1006,214 @@ class TestIndex:
         result = runner.invoke(app, ["index"])
         assert result.exit_code == 1
         assert "semantic" in result.output.lower()
+
+
+class TestLibraries:
+    @patch("riszotto.cli.load_config")
+    @patch("riszotto.cli.get_client")
+    def test_lists_local_groups(self, mock_get_client, mock_config):
+        from riszotto.config import Config
+
+        mock_config.return_value = Config()
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.groups.return_value = [
+            {"id": 111, "data": {"name": "Lab Group"}},
+            {"id": 222, "data": {"name": "Dept. Reading"}},
+        ]
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 0
+        assert "My Library" in result.output
+        assert "Lab Group" in result.output
+        assert "Dept. Reading" in result.output
+        assert "111" in result.output
+        assert "222" in result.output
+
+    @patch("riszotto.cli.load_config")
+    @patch("riszotto.cli.get_client")
+    def test_no_libraries_local_only(self, mock_get_client, mock_config):
+        from riszotto.config import Config
+
+        mock_config.return_value = Config()
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.groups.return_value = []
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 0
+        assert "My Library" in result.output
+
+    @patch("riszotto.cli.zotero.Zotero")
+    @patch("riszotto.cli.load_config")
+    @patch("riszotto.cli.get_client")
+    def test_lists_remote_groups(self, mock_get_client, mock_config, mock_zotero_cls):
+        from riszotto.config import Config
+
+        mock_config.return_value = Config(api_key="k", user_id="u")
+        mock_local = MagicMock()
+        mock_get_client.return_value = mock_local
+        mock_local.groups.return_value = [
+            {"id": 111, "data": {"name": "Local Group"}},
+        ]
+        mock_remote = MagicMock()
+        mock_zotero_cls.return_value = mock_remote
+        mock_remote.groups.return_value = [
+            {"id": 111, "data": {"name": "Local Group"}},
+            {"id": 222, "data": {"name": "Remote Only"}},
+        ]
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 0
+        assert "Local Group" in result.output
+        assert "Remote Only" in result.output
+        lines = result.output.strip().split("\n")
+        local_line = [line for line in lines if "Local Group" in line][0]
+        assert "local" in local_line
+
+
+class TestLibraryFlag:
+    @patch("riszotto.cli.get_client")
+    def test_search_with_library_flag(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = []
+
+        result = runner.invoke(
+            app, ["search", "--library", "Lab Group", "test"]
+        )
+        assert result.exit_code == 0
+        mock_get_client.assert_called_once_with(library="Lab Group")
+
+    @patch("riszotto.cli.get_client")
+    def test_search_with_short_flag(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = []
+
+        result = runner.invoke(app, ["search", "-L", "999", "test"])
+        assert result.exit_code == 0
+        mock_get_client.assert_called_once_with(library="999")
+
+    @patch("riszotto.cli.get_client")
+    def test_search_default_no_library(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = []
+
+        runner.invoke(app, ["search", "test"])
+        mock_get_client.assert_called_once_with(library=None)
+
+    @patch("riszotto.cli.get_client")
+    def test_collections_with_library_flag(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.collections.return_value = []
+
+        result = runner.invoke(
+            app, ["collections", "--library", "Lab Group"]
+        )
+        assert result.exit_code == 0
+        mock_get_client.assert_called_once_with(library="Lab Group")
+
+    @patch("riszotto.cli.get_client")
+    def test_recent_with_library_flag(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = []
+
+        result = runner.invoke(app, ["recent", "--library", "Lab Group"])
+        assert result.exit_code == 0
+        mock_get_client.assert_called_once_with(library="Lab Group")
+
+    @patch("riszotto.cli.get_item_bibtex")
+    @patch("riszotto.cli.get_client")
+    def test_export_with_library_flag(self, mock_get_client, mock_bibtex):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_bibtex.return_value = "@article{x, title={T}}"
+
+        result = runner.invoke(
+            app, ["export", "--library", "Lab Group", "KEY1"]
+        )
+        assert result.exit_code == 0
+        mock_get_client.assert_called_once_with(library="Lab Group")
+
+    @patch("riszotto.cli.get_client")
+    def test_library_not_found_error(self, mock_get_client):
+        from riszotto.client import LibraryNotFoundError
+
+        mock_get_client.side_effect = LibraryNotFoundError("Group 'X' not found")
+        result = runner.invoke(app, ["search", "--library", "X", "test"])
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
+
+    @patch("riszotto.cli.get_client")
+    def test_ambiguous_library_error(self, mock_get_client):
+        from riszotto.client import AmbiguousLibraryError
+
+        mock_get_client.side_effect = AmbiguousLibraryError("matches multiple")
+        result = runner.invoke(
+            app, ["search", "--library", "Lab", "test"]
+        )
+        assert result.exit_code == 1
+        assert "multiple" in result.output.lower()
+
+    @patch("riszotto.cli.get_client")
+    def test_show_with_remote_library_no_local_pdf(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.library_id = "999"
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                },
+                "links": {"enclosure": {"href": "https://api.zotero.org/..."}},
+            }
+        ]
+        result = runner.invoke(
+            app, ["show", "--library", "Remote Group", "ITEM1"]
+        )
+        assert result.exit_code == 1
+        assert "local" in result.output.lower()
+
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli.get_client")
+    def test_semantic_search_with_library_uses_collection_name(
+        self, mock_get_client, mock_import_semantic
+    ):
+        mock_zot = MagicMock()
+        mock_zot.library_id = "987"
+        mock_get_client.return_value = mock_zot
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.semantic_search.return_value = []
+
+        result = runner.invoke(
+            app, ["search", "--semantic", "--library", "Lab", "test"]
+        )
+        assert result.exit_code == 0
+        mock_semantic.semantic_search.assert_called_once_with(
+            "test", limit=25, collection_name="group_987"
+        )
+
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli.get_client")
+    def test_index_status_with_library(self, mock_get_client, mock_import_semantic):
+        mock_zot = MagicMock()
+        mock_zot.library_id = "987"
+        mock_get_client.return_value = mock_zot
+        mock_semantic = MagicMock()
+        mock_import_semantic.return_value = mock_semantic
+        mock_semantic.get_index_status.return_value = {"count": 5, "path": "/x"}
+
+        result = runner.invoke(
+            app, ["index", "--status", "--library", "Lab"]
+        )
+        assert result.exit_code == 0
+        mock_semantic.get_index_status.assert_called_once_with(
+            collection_name="group_987"
+        )
