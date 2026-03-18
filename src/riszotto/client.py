@@ -29,9 +29,7 @@ class AmbiguousLibraryError(Exception):
     """Raised when a library name matches multiple groups."""
 
 
-def find_group(
-    groups: list[dict[str, Any]], library: str
-) -> dict[str, Any] | None:
+def find_group(groups: list[dict[str, Any]], library: str) -> dict[str, Any] | None:
     """Match a library name or ID against a list of Zotero groups.
 
     Resolution order (first match wins):
@@ -64,9 +62,7 @@ def find_group(
             return group
 
     # 2. Substring name match
-    substring_matches = [
-        g for g in groups if needle in g["data"]["name"].lower()
-    ]
+    substring_matches = [g for g in groups if needle in g["data"]["name"].lower()]
     if len(substring_matches) == 1:
         return substring_matches[0]
     if len(substring_matches) > 1:
@@ -119,9 +115,7 @@ def get_client(library: str | None = None) -> zotero.Zotero:
     config = load_config()
 
     # Try local first
-    local_client = zotero.Zotero(
-        library_id="0", library_type="user", local=True
-    )
+    local_client = zotero.Zotero(library_id="0", library_type="user", local=True)
     try:
         local_groups = local_client.groups()
         match = find_group(local_groups, library)
@@ -157,9 +151,7 @@ def get_client(library: str | None = None) -> zotero.Zotero:
         )
 
     available = [g["data"]["name"] for g in remote_groups]
-    raise LibraryNotFoundError(
-        f"Group '{library}' not found. Available: {available}"
-    )
+    raise LibraryNotFoundError(f"Group '{library}' not found. Available: {available}")
 
 
 def search_items(

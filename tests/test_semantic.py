@@ -336,9 +336,7 @@ class TestCollectionNaming:
         mock_zot.everything.return_value = []
 
         build_index(mock_zot, collection_name="group_999")
-        mock_get_col.assert_called_once_with(
-            rebuild=False, collection_name="group_999"
-        )
+        mock_get_col.assert_called_once_with(rebuild=False, collection_name="group_999")
 
     @patch("riszotto.semantic._get_collection")
     def test_semantic_search_uses_collection_name(self, mock_get_col):
@@ -369,9 +367,7 @@ class TestCollectionNaming:
         mock_zot.everything.return_value = []
 
         build_index(mock_zot)
-        mock_get_col.assert_called_once_with(
-            rebuild=False, collection_name="user_0"
-        )
+        mock_get_col.assert_called_once_with(rebuild=False, collection_name="user_0")
 
 
 class TestMigration:

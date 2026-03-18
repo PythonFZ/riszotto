@@ -1079,9 +1079,7 @@ class TestLibraryFlag:
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = []
 
-        result = runner.invoke(
-            app, ["search", "--library", "Lab Group", "test"]
-        )
+        result = runner.invoke(app, ["search", "--library", "Lab Group", "test"])
         assert result.exit_code == 0
         mock_get_client.assert_called_once_with(library="Lab Group")
 
@@ -1110,9 +1108,7 @@ class TestLibraryFlag:
         mock_get_client.return_value = mock_zot
         mock_zot.collections.return_value = []
 
-        result = runner.invoke(
-            app, ["collections", "--library", "Lab Group"]
-        )
+        result = runner.invoke(app, ["collections", "--library", "Lab Group"])
         assert result.exit_code == 0
         mock_get_client.assert_called_once_with(library="Lab Group")
 
@@ -1133,9 +1129,7 @@ class TestLibraryFlag:
         mock_get_client.return_value = mock_zot
         mock_bibtex.return_value = "@article{x, title={T}}"
 
-        result = runner.invoke(
-            app, ["export", "--library", "Lab Group", "KEY1"]
-        )
+        result = runner.invoke(app, ["export", "--library", "Lab Group", "KEY1"])
         assert result.exit_code == 0
         mock_get_client.assert_called_once_with(library="Lab Group")
 
@@ -1153,9 +1147,7 @@ class TestLibraryFlag:
         from riszotto.client import AmbiguousLibraryError
 
         mock_get_client.side_effect = AmbiguousLibraryError("matches multiple")
-        result = runner.invoke(
-            app, ["search", "--library", "Lab", "test"]
-        )
+        result = runner.invoke(app, ["search", "--library", "Lab", "test"])
         assert result.exit_code == 1
         assert "multiple" in result.output.lower()
 
@@ -1174,9 +1166,7 @@ class TestLibraryFlag:
                 "links": {"enclosure": {"href": "https://api.zotero.org/..."}},
             }
         ]
-        result = runner.invoke(
-            app, ["show", "--library", "Remote Group", "ITEM1"]
-        )
+        result = runner.invoke(app, ["show", "--library", "Remote Group", "ITEM1"])
         assert result.exit_code == 1
         assert "local" in result.output.lower()
 
@@ -1210,9 +1200,7 @@ class TestLibraryFlag:
         mock_import_semantic.return_value = mock_semantic
         mock_semantic.get_index_status.return_value = {"count": 5, "path": "/x"}
 
-        result = runner.invoke(
-            app, ["index", "--status", "--library", "Lab"]
-        )
+        result = runner.invoke(app, ["index", "--status", "--library", "Lab"])
         assert result.exit_code == 0
         mock_semantic.get_index_status.assert_called_once_with(
             collection_name="group_987"

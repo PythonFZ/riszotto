@@ -21,9 +21,7 @@ class TestConfig:
 
     def test_env_vars_override_file(self, tmp_path):
         config_file = tmp_path / "config.toml"
-        config_file.write_text(
-            '[zotero]\napi_key = "file_key"\nuser_id = "file_id"\n'
-        )
+        config_file.write_text('[zotero]\napi_key = "file_key"\nuser_id = "file_id"\n')
         with (
             patch("riszotto.config.CONFIG_PATH", config_file),
             patch.dict(
