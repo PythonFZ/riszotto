@@ -528,13 +528,22 @@ def libraries() -> None:
         )
         for group in local_zot.groups():
             seen_ids.add(group["id"])
+            try:
+                group_zot = zotero.Zotero(
+                    library_id=str(group["id"]),
+                    library_type="group",
+                    local=True,
+                )
+                num = group_zot.num_items()
+            except Exception:
+                num = "?"
             libs.append(
                 {
                     "name": group["data"]["name"],
                     "id": str(group["id"]),
                     "type": "group",
                     "source": "local",
-                    "items": group.get("meta", {}).get("numItems", "?"),
+                    "items": num,
                 }
             )
     except Exception:
