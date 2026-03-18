@@ -42,7 +42,6 @@ def _build_document_text(item: dict) -> str:
     return " ".join(parts)
 
 
-
 def _get_collection(*, rebuild: bool = False, collection_name: str = "user_0"):
     """Get or create a ChromaDB collection by name.
 

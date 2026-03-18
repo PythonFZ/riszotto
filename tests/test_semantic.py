@@ -368,5 +368,3 @@ class TestCollectionNaming:
 
         build_index(mock_zot)
         mock_get_col.assert_called_once_with(rebuild=False, collection_name="user_0")
-
-
