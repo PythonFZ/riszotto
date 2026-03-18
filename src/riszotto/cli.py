@@ -8,6 +8,7 @@ from typing import Annotated, Optional
 import typer
 from markitdown import MarkItDown
 from pyzotero import zotero
+from pyzotero.zotero_errors import PyZoteroError
 
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
@@ -54,19 +55,17 @@ def _get_zot(library: str | None = None) -> zotero.Zotero:
     except (LibraryNotFoundError, AmbiguousLibraryError) as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1)
-    except (ConnectionError, Exception) as e:
-        if "connection" in str(e).lower() or "refused" in str(e).lower():
-            typer.echo(
-                "Zotero desktop is not running. Start Zotero and ensure the local API is enabled.",
-                err=True,
-            )
-            raise typer.Exit(1)
-        raise
+    except ConnectionError:
+        typer.echo(
+            "Zotero desktop is not running. Start Zotero and ensure the local API is enabled.",
+            err=True,
+        )
+        raise typer.Exit(1)
 
 
-def _collection_name(zot: zotero.Zotero, library: str | None) -> str:
+def _collection_name(zot: zotero.Zotero) -> str:
     """Derive ChromaDB collection name from the resolved Zotero client."""
-    if library is None:
+    if zot.library_type == "users":
         return "user_0"
     return f"group_{zot.library_id}"
 
@@ -177,7 +176,7 @@ def search(
             raise typer.Exit(1)
 
         zot = _get_zot(library=library)
-        col = _collection_name(zot, library)
+        col = _collection_name(zot)
         status = sem.get_index_status(collection_name=col)
         if status["count"] == 0:
             lib_hint = f' --library "{library}"' if library else ""
@@ -495,7 +494,7 @@ def index(
         raise typer.Exit(1)
 
     zot = _get_zot(library=library)
-    col = _collection_name(zot, library)
+    col = _collection_name(zot)
 
     if status:
         info = semantic.get_index_status(collection_name=col)
@@ -535,7 +534,7 @@ def libraries() -> None:
                     local=True,
                 )
                 num = group_zot.num_items()
-            except Exception:
+            except (ConnectionError, OSError, PyZoteroError):
                 num = "?"
             libs.append(
                 {
@@ -546,7 +545,7 @@ def libraries() -> None:
                     "items": num,
                 }
             )
-    except Exception:
+    except (ConnectionError, OSError, PyZoteroError):
         libs.append(
             {
                 "name": "My Library",
@@ -576,8 +575,8 @@ def libraries() -> None:
                             "items": group.get("meta", {}).get("numItems", "?"),
                         }
                     )
-        except Exception:
-            pass
+        except (ConnectionError, OSError, PyZoteroError) as e:
+            typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
 
     # Format as markdown table
     header = f"{'Name':<30} {'ID':<10} {'Type':<8} {'Items':<8} {'Source'}"

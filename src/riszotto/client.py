@@ -7,6 +7,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from pyzotero import zotero
+from pyzotero.zotero_errors import PyZoteroError
 
 from riszotto.config import load_config
 from riszotto.formatting import CHILD_ITEM_TYPES
@@ -125,7 +126,7 @@ def get_client(library: str | None = None) -> zotero.Zotero:
                 library_type="group",
                 local=True,
             )
-    except Exception:
+    except (ConnectionError, OSError, PyZoteroError):
         pass  # local API not available
 
     # Fall back to remote

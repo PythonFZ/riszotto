@@ -277,6 +277,7 @@ class TestSearchSemantic:
         self, mock_import_semantic, mock_get_client
     ):
         mock_zot = MagicMock()
+        mock_zot.library_type = "users"
         mock_get_client.return_value = mock_zot
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
@@ -327,7 +328,7 @@ class TestSearchSemantic:
     @patch("riszotto.cli.get_client")
     @patch("riszotto.cli._import_semantic")
     def test_semantic_search_no_results(self, mock_import_semantic, mock_get_client):
-        mock_get_client.return_value = MagicMock()
+        mock_get_client.return_value = MagicMock(library_type="users")
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
         mock_semantic.semantic_search.return_value = []
@@ -351,6 +352,7 @@ class TestSearchSemantic:
         self, mock_import_semantic, mock_get_client
     ):
         mock_zot = MagicMock()
+        mock_zot.library_type = "users"
         mock_get_client.return_value = mock_zot
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
@@ -413,7 +415,7 @@ class TestSearchSemantic:
     def test_semantic_search_respects_limit(
         self, mock_import_semantic, mock_get_client
     ):
-        mock_get_client.return_value = MagicMock()
+        mock_get_client.return_value = MagicMock(library_type="users")
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
         mock_semantic.semantic_search.return_value = []
@@ -955,6 +957,7 @@ class TestIndex:
     @patch("riszotto.cli._import_semantic")
     def test_index_builds(self, mock_import_semantic, mock_get_client):
         mock_zot = MagicMock()
+        mock_zot.library_type = "users"
         mock_get_client.return_value = mock_zot
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
@@ -971,6 +974,7 @@ class TestIndex:
     @patch("riszotto.cli._import_semantic")
     def test_index_rebuild(self, mock_import_semantic, mock_get_client):
         mock_zot = MagicMock()
+        mock_zot.library_type = "users"
         mock_get_client.return_value = mock_zot
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
@@ -985,7 +989,7 @@ class TestIndex:
     @patch("riszotto.cli.get_client")
     @patch("riszotto.cli._import_semantic")
     def test_index_status(self, mock_import_semantic, mock_get_client):
-        mock_get_client.return_value = MagicMock()
+        mock_get_client.return_value = MagicMock(library_type="users")
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
         mock_semantic.get_index_status.return_value = {
@@ -1177,6 +1181,7 @@ class TestLibraryFlag:
     ):
         mock_zot = MagicMock()
         mock_zot.library_id = "987"
+        mock_zot.library_type = "groups"
         mock_get_client.return_value = mock_zot
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic
@@ -1195,6 +1200,7 @@ class TestLibraryFlag:
     def test_index_status_with_library(self, mock_get_client, mock_import_semantic):
         mock_zot = MagicMock()
         mock_zot.library_id = "987"
+        mock_zot.library_type = "groups"
         mock_get_client.return_value = mock_zot
         mock_semantic = MagicMock()
         mock_import_semantic.return_value = mock_semantic

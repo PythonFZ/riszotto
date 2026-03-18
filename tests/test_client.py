@@ -535,3 +535,16 @@ class TestGetClientWithLibrary:
 
         with pytest.raises(LibraryNotFoundError, match="Other Group"):
             get_client(library="Nonexistent")
+
+    @patch("riszotto.client.load_config", return_value=Config(api_key="k", user_id="u"))
+    @patch("riszotto.client.zotero.Zotero")
+    def test_ambiguous_library_propagates_from_local(self, mock_zotero, mock_config):
+        mock_local = MagicMock()
+        mock_local.groups.return_value = [
+            {"id": 1, "data": {"name": "Physics Lab"}},
+            {"id": 2, "data": {"name": "Chemistry Lab"}},
+        ]
+        mock_zotero.return_value = mock_local
+
+        with pytest.raises(AmbiguousLibraryError, match="multiple"):
+            get_client(library="Lab")
