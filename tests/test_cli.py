@@ -1079,6 +1079,21 @@ class TestLibraries:
         local_line = [line for line in lines if "Local Group" in line][0]
         assert "local" in local_line
 
+    @patch("riszotto.cli.load_config")
+    @patch("riszotto.cli.get_client")
+    def test_errors_when_local_and_remote_unavailable(
+        self, mock_get_client, mock_config
+    ):
+        from riszotto.config import Config
+
+        mock_config.return_value = Config()
+        mock_get_client.side_effect = ConnectionError("not running")
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 1
+        assert "not running" in result.output.lower()
+        assert "config" in result.output.lower()
+
 
 class TestLibraryFlag:
     @patch("riszotto.cli.get_client")

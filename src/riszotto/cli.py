@@ -65,7 +65,7 @@ def _get_zot(library: str | None = None) -> zotero.Zotero:
 
 def _collection_name(zot: zotero.Zotero) -> str:
     """Derive ChromaDB collection name from the resolved Zotero client."""
-    if zot.library_type == "users":
+    if zot.library_type in ("user", "users"):
         return "user_0"
     return f"group_{zot.library_id}"
 
@@ -546,6 +546,14 @@ def libraries() -> None:
                 }
             )
     except (ConnectionError, OSError, PyZoteroError):
+        if not config.has_remote_credentials:
+            typer.echo(
+                "Zotero desktop is not running and no remote config found. "
+                "Start Zotero or configure api_key and user_id in "
+                "~/.riszotto/config.toml.",
+                err=True,
+            )
+            raise typer.Exit(1)
         libs.append(
             {
                 "name": "My Library",

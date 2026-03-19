@@ -196,7 +196,7 @@ The ChromaDB store at `~/.riszotto/chroma_db/` currently uses a single collectio
 
 ### Migration from existing index
 
-On first access, if a collection named `"zotero"` exists and no `user_0` collection exists, automatically rename `"zotero"` to `"user_0"`. This preserves the existing index without requiring a rebuild. ChromaDB supports `get_or_create_collection`, so the migration is a one-time read-rename operation.
+~~On first access, if a collection named `"zotero"` exists and no `user_0` collection exists, automatically rename `"zotero"` to `"user_0"`.~~ **Decision (2026-03-19):** Automatic migration was intentionally removed. Existing users with a `"zotero"` collection must rebuild their index via `riszotto index --rebuild`. The simplification avoids coupling to ChromaDB's internal rename semantics.
 
 ### Function signature changes
 
