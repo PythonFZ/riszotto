@@ -36,4 +36,6 @@ version-file = "src/riszotto/_version.py"
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "httpx>=0.24.0",
+    "fastapi>=0.100.0",
 ]
