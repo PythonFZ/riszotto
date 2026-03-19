@@ -1374,8 +1374,20 @@ class TestAllLibrariesSearch:
         mock_zot2 = MagicMock()
         mock_zot2.items.return_value = []
         mock_discover.return_value = [
-            {"name": "My Library", "id": "0", "type": "user", "source": "local", "client": mock_zot1},
-            {"name": "Empty Group", "id": "1", "type": "group", "source": "local", "client": mock_zot2},
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot1,
+            },
+            {
+                "name": "Empty Group",
+                "id": "1",
+                "type": "group",
+                "source": "local",
+                "client": mock_zot2,
+            },
         ]
 
         result = runner.invoke(app, ["search", "--all-libraries", "test"])
@@ -1406,8 +1418,20 @@ class TestAllLibrariesSearch:
         mock_zot2.library_id = "999"
 
         mock_discover.return_value = [
-            {"name": "My Library", "id": "0", "type": "user", "source": "local", "client": mock_zot1},
-            {"name": "Unindexed Group", "id": "999", "type": "group", "source": "local", "client": mock_zot2},
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot1,
+            },
+            {
+                "name": "Unindexed Group",
+                "id": "999",
+                "type": "group",
+                "source": "local",
+                "client": mock_zot2,
+            },
         ]
 
         def index_side_effect(collection_name):
@@ -1431,9 +1455,7 @@ class TestAllLibrariesSearch:
             },
         }
 
-        result = runner.invoke(
-            app, ["search", "--all-libraries", "--semantic", "test"]
-        )
+        result = runner.invoke(app, ["search", "--all-libraries", "--semantic", "test"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert "My Library" in parsed
@@ -1450,7 +1472,13 @@ class TestLibrariesIndexStatus:
         mock_zot = MagicMock()
         mock_zot.num_items.return_value = 100
         mock_discover.return_value = [
-            {"name": "My Library", "id": "0", "type": "user", "source": "local", "client": mock_zot},
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot,
+            },
         ]
         mock_sem.get_index_status.return_value = {"count": 50}
 
@@ -1467,7 +1495,13 @@ class TestLibrariesIndexStatus:
         mock_zot = MagicMock()
         mock_zot.num_items.return_value = 100
         mock_discover.return_value = [
-            {"name": "My Library", "id": "0", "type": "user", "source": "local", "client": mock_zot},
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot,
+            },
         ]
 
         result = runner.invoke(app, ["libraries"])
@@ -1488,8 +1522,20 @@ class TestLibrariesIndexStatus:
         mock_zot2.num_items.return_value = 50
 
         mock_discover.return_value = [
-            {"name": "My Library", "id": "0", "type": "user", "source": "local", "client": mock_zot1},
-            {"name": "Lab Group", "id": "999", "type": "group", "source": "local", "client": mock_zot2},
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot1,
+            },
+            {
+                "name": "Lab Group",
+                "id": "999",
+                "type": "group",
+                "source": "local",
+                "client": mock_zot2,
+            },
         ]
 
         def index_side_effect(collection_name):

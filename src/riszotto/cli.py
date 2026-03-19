@@ -165,13 +165,15 @@ def _discover_libraries() -> list[dict]:
 
     try:
         local_zot = get_client()
-        libs.append({
-            "name": "My Library",
-            "id": "0",
-            "type": "user",
-            "source": "local",
-            "client": local_zot,
-        })
+        libs.append(
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": local_zot,
+            }
+        )
         for group in local_zot.groups():
             seen_ids.add(group["id"])
             try:
@@ -180,13 +182,15 @@ def _discover_libraries() -> list[dict]:
                     library_type="group",
                     local=True,
                 )
-                libs.append({
-                    "name": group["data"]["name"],
-                    "id": str(group["id"]),
-                    "type": "group",
-                    "source": "local",
-                    "client": group_zot,
-                })
+                libs.append(
+                    {
+                        "name": group["data"]["name"],
+                        "id": str(group["id"]),
+                        "type": "group",
+                        "source": "local",
+                        "client": group_zot,
+                    }
+                )
             except (ConnectionError, OSError, PyZoteroError):
                 pass
     except (ConnectionError, OSError, PyZoteroError):
@@ -206,20 +210,18 @@ def _discover_libraries() -> list[dict]:
                         library_type="group",
                         api_key=config.api_key,
                     )
-                    libs.append({
-                        "name": group["data"]["name"],
-                        "id": str(group["id"]),
-                        "type": "group",
-                        "source": "remote",
-                        "client": group_zot,
-                        "meta_items": group.get("meta", {}).get(
-                            "numItems", "?"
-                        ),
-                    })
+                    libs.append(
+                        {
+                            "name": group["data"]["name"],
+                            "id": str(group["id"]),
+                            "type": "group",
+                            "source": "remote",
+                            "client": group_zot,
+                            "meta_items": group.get("meta", {}).get("numItems", "?"),
+                        }
+                    )
         except (ConnectionError, OSError, PyZoteroError) as e:
-            typer.echo(
-                f"Warning: remote group discovery failed: {e}", err=True
-            )
+            typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
 
     return libs
 
@@ -269,9 +271,7 @@ def _search_all_libraries(
                 if status["count"] == 0:
                     continue
             except Exception as e:
-                typer.echo(
-                    f"Warning: skipping {lib_name}: {e}", err=True
-                )
+                typer.echo(f"Warning: skipping {lib_name}: {e}", err=True)
                 continue
             hits = sem.semantic_search(query, limit=limit, collection_name=col)
             results = []
