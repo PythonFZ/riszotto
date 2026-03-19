@@ -127,6 +127,10 @@ def build_index(
             {
                 "title": data.get("title", ""),
                 "itemType": data.get("itemType", ""),
+                "creators": "; ".join(
+                    format_creator(c) for c in data.get("creators", [])
+                ),
+                "date": data.get("date", ""),
             }
         )
 
@@ -171,6 +175,8 @@ def semantic_search(
                 "key": key,
                 "title": meta.get("title", ""),
                 "itemType": meta.get("itemType", ""),
+                "creators": meta.get("creators", ""),
+                "date": meta.get("date", ""),
                 "score": score,
             }
         )

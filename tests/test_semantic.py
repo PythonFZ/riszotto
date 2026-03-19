@@ -253,6 +253,47 @@ class TestBuildIndex:
         build_index(mock_zot, limit=100)
         mock_zot.top.assert_called_once_with(limit=100)
 
+    def test_build_index_stores_enriched_metadata(self):
+        """Verify build_index stores creators and date in ChromaDB metadata."""
+        mock_collection = MagicMock()
+        mock_collection.get.return_value = {"ids": []}
+
+        items = [
+            {
+                "key": "ABC123",
+                "data": {
+                    "title": "Test Paper",
+                    "itemType": "journalArticle",
+                    "creators": [
+                        {"creatorType": "author", "lastName": "Smith", "firstName": "John"},
+                        {"creatorType": "author", "lastName": "Doe", "firstName": "Jane"},
+                    ],
+                    "date": "2023-06-15",
+                    "abstractNote": "Abstract text.",
+                    "tags": [],
+                },
+            }
+        ]
+
+        with (
+            patch("riszotto.semantic._get_collection", return_value=mock_collection),
+            patch.object(mock_collection, "count", return_value=0),
+        ):
+            from riszotto.semantic import build_index
+
+            mock_zot = MagicMock()
+            # build_index uses zot.everything(zot.top()) when limit is None
+            mock_zot.top.return_value = items
+            mock_zot.everything.return_value = items
+            build_index(mock_zot, rebuild=True)
+
+        call_args = mock_collection.upsert.call_args
+        metadatas = call_args[1]["metadatas"] if "metadatas" in call_args[1] else call_args[0][2]
+        assert metadatas[0]["creators"] == "Smith, John; Doe, Jane"
+        assert metadatas[0]["date"] == "2023-06-15"
+        assert metadatas[0]["title"] == "Test Paper"
+        assert metadatas[0]["itemType"] == "journalArticle"
+
 
 class TestSemanticSearch:
     @patch("riszotto.semantic._get_collection")
@@ -303,6 +344,27 @@ class TestSemanticSearch:
         results = semantic_search("anything")
         assert results == []
         mock_collection.query.assert_not_called()
+
+    @patch("riszotto.semantic._get_collection")
+    def test_semantic_search_returns_enriched_fields(self, mock_get_col):
+        """Verify search results include creators and date."""
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 1
+        mock_collection.query.return_value = {
+            "ids": [["key1"]],
+            "distances": [[0.2]],
+            "metadatas": [[{
+                "title": "Test",
+                "itemType": "journalArticle",
+                "creators": "Smith, John",
+                "date": "2023",
+            }]],
+        }
+
+        results = semantic_search("test query")
+        assert results[0]["creators"] == "Smith, John"
+        assert results[0]["date"] == "2023"
 
 
 class TestGetIndexStatus:
