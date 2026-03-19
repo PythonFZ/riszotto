@@ -1461,6 +1461,28 @@ class TestAllLibrariesSearch:
         assert "My Library" in parsed
         assert "Unindexed Group" not in parsed
 
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli._discover_libraries")
+    def test_semantic_index_error_warns_to_stderr(self, mock_discover, mock_import_sem):
+        mock_sem = MagicMock()
+        mock_import_sem.return_value = mock_sem
+
+        mock_zot = MagicMock()
+        mock_zot.library_type = "group"
+        mock_zot.library_id = "999"
+
+        mock_discover.return_value = [
+            {"name": "Broken Lib", "id": "999", "type": "group", "source": "local", "client": mock_zot},
+        ]
+        mock_sem.get_index_status.side_effect = RuntimeError("connection refused")
+
+        result = runner.invoke(
+            app, ["search", "--all-libraries", "--semantic", "test"]
+        )
+        assert result.exit_code == 0
+        assert "Warning: skipping Broken Lib" in result.output
+        assert "connection refused" in result.output
+
 
 class TestLibrariesIndexStatus:
     @patch("riszotto.cli._import_semantic")
@@ -1550,3 +1572,21 @@ class TestLibrariesIndexStatus:
         lines = result.output.strip().split("\n")
         assert "75" in lines[2]
         assert "-" in lines[3]
+
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli._discover_libraries")
+    def test_index_error_warns_to_stderr(self, mock_discover, mock_import_sem):
+        mock_sem = MagicMock()
+        mock_import_sem.return_value = mock_sem
+        mock_sem.get_index_status.side_effect = RuntimeError("db corrupt")
+
+        mock_zot = MagicMock()
+        mock_zot.num_items.return_value = 10
+        mock_discover.return_value = [
+            {"name": "My Library", "id": "0", "type": "user", "source": "local", "client": mock_zot},
+        ]
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 0
+        assert "Warning: index check failed" in result.output
+        assert "db corrupt" in result.output
