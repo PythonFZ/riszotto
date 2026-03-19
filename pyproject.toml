@@ -22,6 +22,10 @@ semantic = [
     "sentence-transformers>=2.2.0",
     "tqdm>=4.0.0",
 ]
+web = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+]
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -29,6 +33,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/riszotto"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/riszotto/static" = "riszotto/static"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/riszotto/_version.py"

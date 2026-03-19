@@ -9,3 +9,11 @@ _version.py
 
 # Virtual environments
 .venv
+
+# Frontend
+node_modules/
+frontend/dist/
+src/riszotto/static/
+
+# Brainstorming
+.superpowers/

@@ -689,6 +689,38 @@ def index(
 
 
 @app.command()
+def web(
+    port: int = typer.Option(8080, "--port", "-p", help="Port to serve on."),
+    no_open: bool = typer.Option(False, "--no-open", help="Don't open browser automatically."),
+) -> None:
+    """Launch the web UI for interactive semantic search."""
+    try:
+        import uvicorn
+    except ImportError:
+        typer.echo("Web UI requires extra dependencies. Install with:")
+        typer.echo("  pip install riszotto[web]")
+        raise typer.Exit(1)
+
+    from riszotto.api import create_app
+
+    app_instance = create_app()
+
+    if not no_open:
+        import webbrowser
+        import threading
+
+        def open_browser():
+            import time
+            time.sleep(1)
+            webbrowser.open(f"http://localhost:{port}")
+
+        threading.Thread(target=open_browser, daemon=True).start()
+
+    typer.echo(f"Starting riszotto web UI on http://localhost:{port}")
+    uvicorn.run(app_instance, host="127.0.0.1", port=port, log_level="warning")
+
+
+@app.command()
 def libraries() -> None:
     """List available Zotero libraries."""
     config = load_config()
