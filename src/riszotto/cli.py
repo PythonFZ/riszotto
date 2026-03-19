@@ -151,78 +151,16 @@ def _format_result(item: dict, max_value_size: int) -> dict:
 
 
 def _discover_libraries() -> list[dict]:
-    """Discover all accessible libraries and return metadata with clients.
+    """Discover libraries and attach live client objects for CLI use."""
+    from riszotto.client import discover_libraries
 
-    Returns
-    -------
-    list[dict]
-        Each dict has keys: name, id, type, source, client.
-        Remote group entries also include ``meta_items``.
-    """
-    config = load_config()
-    libs: list[dict] = []
-    seen_ids: set[int] = set()
-
-    try:
-        local_zot = get_client()
-        libs.append(
-            {
-                "name": "My Library",
-                "id": "0",
-                "type": "user",
-                "source": "local",
-                "client": local_zot,
-            }
-        )
-        for group in local_zot.groups():
-            seen_ids.add(group["id"])
-            try:
-                group_zot = zotero.Zotero(
-                    library_id=str(group["id"]),
-                    library_type="group",
-                    local=True,
-                )
-                libs.append(
-                    {
-                        "name": group["data"]["name"],
-                        "id": str(group["id"]),
-                        "type": "group",
-                        "source": "local",
-                        "client": group_zot,
-                    }
-                )
-            except (ConnectionError, OSError, PyZoteroError):
-                pass
-    except (ConnectionError, OSError, PyZoteroError):
-        pass
-
-    if config.has_remote_credentials:
+    libs = discover_libraries()
+    for lib in libs:
         try:
-            remote = zotero.Zotero(
-                library_id=config.user_id,
-                library_type="user",
-                api_key=config.api_key,
-            )
-            for group in remote.groups():
-                if group["id"] not in seen_ids:
-                    group_zot = zotero.Zotero(
-                        library_id=str(group["id"]),
-                        library_type="group",
-                        api_key=config.api_key,
-                    )
-                    libs.append(
-                        {
-                            "name": group["data"]["name"],
-                            "id": str(group["id"]),
-                            "type": "group",
-                            "source": "remote",
-                            "client": group_zot,
-                            "meta_items": group.get("meta", {}).get("numItems", "?"),
-                        }
-                    )
-        except (ConnectionError, OSError, PyZoteroError) as e:
-            typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
-
+            lib_arg = None if lib["type"] == "user" else str(lib["id"])
+            lib["client"] = get_client(lib_arg)
+        except Exception:
+            lib["client"] = None
     return libs
 
 

@@ -155,6 +155,85 @@ def get_client(library: str | None = None) -> zotero.Zotero:
     raise LibraryNotFoundError(f"Group '{library}' not found. Available: {available}")
 
 
+def _discover_remote_groups(config) -> list[dict[str, Any]]:
+    """Discover groups via remote Zotero API if credentials are available.
+
+    Parameters
+    ----------
+    config : Config
+        Application configuration object.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        List of group dicts from pyzotero, or empty list if unavailable.
+    """
+    if not config.has_remote_credentials:
+        return []
+    try:
+        remote_zot = zotero.Zotero(config.user_id, "user", config.api_key)
+        return remote_zot.groups() or []
+    except Exception:
+        return []
+
+
+def discover_libraries() -> list[dict[str, Any]]:
+    """Discover all accessible Zotero libraries (personal + groups).
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Each dict has keys: name, id, type ("user" or "group"), source ("local" or "remote"),
+        and collection_name (ChromaDB collection name for semantic indexing).
+    """
+    config = load_config()
+    libraries: list[dict[str, Any]] = []
+    seen_group_ids: set[int] = set()
+
+    # Personal library is always present
+    libraries.append({
+        "name": "My Library",
+        "id": "0",
+        "type": "user",
+        "source": "local",
+        "collection_name": "user_0",
+    })
+
+    # Local groups
+    try:
+        zot = get_client()
+        for group in zot.groups() or []:
+            gid = group.get("id") or group.get("data", {}).get("id")
+            gname = group.get("data", {}).get("name", f"Group {gid}")
+            if gid and gid not in seen_group_ids:
+                seen_group_ids.add(gid)
+                libraries.append({
+                    "name": gname,
+                    "id": str(gid),  # always string for consistency
+                    "type": "group",
+                    "source": "local",
+                    "collection_name": f"group_{gid}",
+                })
+    except Exception:
+        pass  # Local API may not be running
+
+    # Remote groups (deduplicated)
+    for group in _discover_remote_groups(config):
+        gid = group.get("id") or group.get("data", {}).get("id")
+        gname = group.get("data", {}).get("name", f"Group {gid}")
+        if gid and gid not in seen_group_ids:
+            seen_group_ids.add(gid)
+            libraries.append({
+                "name": gname,
+                "id": str(gid),  # always string for consistency
+                "type": "group",
+                "source": "remote",
+                "collection_name": f"group_{gid}",
+            })
+
+    return libraries
+
+
 def search_items(
     zot: zotero.Zotero,
     query: str,
