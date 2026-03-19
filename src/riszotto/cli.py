@@ -150,15 +150,30 @@ def _format_result(item: dict, max_value_size: int) -> dict:
     return _filter_long_values(result, max_value_size)
 
 
-def _discover_libraries() -> list[tuple[str, zotero.Zotero]]:
-    """Discover all accessible libraries and return (name, client) pairs."""
+def _discover_libraries() -> list[dict]:
+    """Discover all accessible libraries and return metadata with clients.
+
+    Returns
+    -------
+    list[dict]
+        Each dict has keys: name, id, type, source, client.
+        Remote group entries also include ``meta_items``.
+    """
     config = load_config()
-    libs: list[tuple[str, zotero.Zotero]] = []
+    libs: list[dict] = []
     seen_ids: set[int] = set()
 
     try:
         local_zot = get_client()
-        libs.append(("My Library", local_zot))
+        libs.append(
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": local_zot,
+            }
+        )
         for group in local_zot.groups():
             seen_ids.add(group["id"])
             try:
@@ -167,7 +182,15 @@ def _discover_libraries() -> list[tuple[str, zotero.Zotero]]:
                     library_type="group",
                     local=True,
                 )
-                libs.append((group["data"]["name"], group_zot))
+                libs.append(
+                    {
+                        "name": group["data"]["name"],
+                        "id": str(group["id"]),
+                        "type": "group",
+                        "source": "local",
+                        "client": group_zot,
+                    }
+                )
             except (ConnectionError, OSError, PyZoteroError):
                 pass
     except (ConnectionError, OSError, PyZoteroError):
@@ -187,9 +210,18 @@ def _discover_libraries() -> list[tuple[str, zotero.Zotero]]:
                         library_type="group",
                         api_key=config.api_key,
                     )
-                    libs.append((group["data"]["name"], group_zot))
-        except (ConnectionError, OSError, PyZoteroError):
-            pass
+                    libs.append(
+                        {
+                            "name": group["data"]["name"],
+                            "id": str(group["id"]),
+                            "type": "group",
+                            "source": "remote",
+                            "client": group_zot,
+                            "meta_items": group.get("meta", {}).get("numItems", "?"),
+                        }
+                    )
+        except (ConnectionError, OSError, PyZoteroError) as e:
+            typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
 
     return libs
 
@@ -230,14 +262,16 @@ def _search_all_libraries(
 
     grouped: dict[str, dict] = {}
 
-    for lib_name, zot in libs:
+    for lib in libs:
+        lib_name, zot = lib["name"], lib["client"]
         if semantic:
             col = _collection_name(zot)
             try:
                 status = sem.get_index_status(collection_name=col)
                 if status["count"] == 0:
                     continue
-            except Exception:
+            except Exception as e:
+                typer.echo(f"Warning: skipping {lib_name}: {e}", err=True)
                 continue
             hits = sem.semantic_search(query, limit=limit, collection_name=col)
             results = []
@@ -720,43 +754,9 @@ def index(
 def libraries() -> None:
     """List available Zotero libraries."""
     config = load_config()
-    libs: list[dict] = []
-    seen_ids: set[int] = set()
+    discovered = _discover_libraries()
 
-    # Try local groups
-    try:
-        local_zot = get_client()
-        num_personal = local_zot.num_items()
-        libs.append(
-            {
-                "name": "My Library",
-                "id": "0",
-                "type": "user",
-                "source": "local",
-                "items": num_personal,
-            }
-        )
-        for group in local_zot.groups():
-            seen_ids.add(group["id"])
-            try:
-                group_zot = zotero.Zotero(
-                    library_id=str(group["id"]),
-                    library_type="group",
-                    local=True,
-                )
-                num = group_zot.num_items()
-            except (ConnectionError, OSError, PyZoteroError):
-                num = "?"
-            libs.append(
-                {
-                    "name": group["data"]["name"],
-                    "id": str(group["id"]),
-                    "type": "group",
-                    "source": "local",
-                    "items": num,
-                }
-            )
-    except (ConnectionError, OSError, PyZoteroError):
+    if not discovered:
         if not config.has_remote_credentials:
             typer.echo(
                 "Zotero desktop is not running and no remote config found. "
@@ -765,37 +765,35 @@ def libraries() -> None:
                 err=True,
             )
             raise typer.Exit(1)
-        libs.append(
+        discovered = [
             {
                 "name": "My Library",
                 "id": "0",
                 "type": "user",
                 "source": "local",
-                "items": "?",
+                "client": None,
             }
-        )
+        ]
 
-    # Try remote groups
-    if config.has_remote_credentials:
-        try:
-            remote = zotero.Zotero(
-                library_id=config.user_id,
-                library_type="user",
-                api_key=config.api_key,
-            )
-            for group in remote.groups():
-                if group["id"] not in seen_ids:
-                    libs.append(
-                        {
-                            "name": group["data"]["name"],
-                            "id": str(group["id"]),
-                            "type": "group",
-                            "source": "remote",
-                            "items": group.get("meta", {}).get("numItems", "?"),
-                        }
-                    )
-        except (ConnectionError, OSError, PyZoteroError) as e:
-            typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
+    # Build display list with items count
+    libs: list[dict] = []
+    for lib_info in discovered:
+        entry = {
+            "name": lib_info["name"],
+            "id": lib_info["id"],
+            "type": lib_info["type"],
+            "source": lib_info["source"],
+        }
+        if "meta_items" in lib_info:
+            entry["items"] = lib_info["meta_items"]
+        elif lib_info.get("client"):
+            try:
+                entry["items"] = lib_info["client"].num_items()
+            except (ConnectionError, OSError, PyZoteroError):
+                entry["items"] = "?"
+        else:
+            entry["items"] = "?"
+        libs.append(entry)
 
     # Add index status
     sem = _import_semantic()
@@ -807,7 +805,11 @@ def libraries() -> None:
             try:
                 status = sem.get_index_status(collection_name=col)
                 lib["indexed"] = status["count"] if status["count"] > 0 else "-"
-            except Exception:
+            except Exception as e:
+                typer.echo(
+                    f"Warning: index check failed for {lib['name']}: {e}",
+                    err=True,
+                )
                 lib["indexed"] = "-"
 
     # Format as markdown table

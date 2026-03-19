@@ -1374,8 +1374,20 @@ class TestAllLibrariesSearch:
         mock_zot2 = MagicMock()
         mock_zot2.items.return_value = []
         mock_discover.return_value = [
-            ("My Library", mock_zot1),
-            ("Empty Group", mock_zot2),
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot1,
+            },
+            {
+                "name": "Empty Group",
+                "id": "1",
+                "type": "group",
+                "source": "local",
+                "client": mock_zot2,
+            },
         ]
 
         result = runner.invoke(app, ["search", "--all-libraries", "test"])
@@ -1391,3 +1403,200 @@ class TestAllLibrariesSearch:
         result = runner.invoke(app, ["search", "--all-libraries", "test"])
         assert result.exit_code == 1
         assert "no accessible" in result.output.lower()
+
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli._discover_libraries")
+    def test_semantic_skips_unindexed(self, mock_discover, mock_import_sem):
+        mock_sem = MagicMock()
+        mock_import_sem.return_value = mock_sem
+
+        mock_zot1 = MagicMock()
+        mock_zot1.library_type = "user"
+        mock_zot1.library_id = "0"
+        mock_zot2 = MagicMock()
+        mock_zot2.library_type = "group"
+        mock_zot2.library_id = "999"
+
+        mock_discover.return_value = [
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot1,
+            },
+            {
+                "name": "Unindexed Group",
+                "id": "999",
+                "type": "group",
+                "source": "local",
+                "client": mock_zot2,
+            },
+        ]
+
+        def index_side_effect(collection_name):
+            if collection_name == "user_0":
+                return {"count": 5}
+            return {"count": 0}
+
+        mock_sem.get_index_status.side_effect = index_side_effect
+        mock_sem.semantic_search.return_value = [
+            {"key": "K1", "score": 0.9},
+        ]
+        mock_zot1.item.return_value = {
+            "data": {
+                "key": "K1",
+                "title": "Indexed Paper",
+                "itemType": "journalArticle",
+                "date": "2023",
+                "abstractNote": "",
+                "creators": [],
+                "tags": [],
+            },
+        }
+
+        result = runner.invoke(app, ["search", "--all-libraries", "--semantic", "test"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert "My Library" in parsed
+        assert "Unindexed Group" not in parsed
+
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli._discover_libraries")
+    def test_semantic_index_error_warns_to_stderr(self, mock_discover, mock_import_sem):
+        mock_sem = MagicMock()
+        mock_import_sem.return_value = mock_sem
+
+        mock_zot = MagicMock()
+        mock_zot.library_type = "group"
+        mock_zot.library_id = "999"
+
+        mock_discover.return_value = [
+            {
+                "name": "Broken Lib",
+                "id": "999",
+                "type": "group",
+                "source": "local",
+                "client": mock_zot,
+            },
+        ]
+        mock_sem.get_index_status.side_effect = RuntimeError("connection refused")
+
+        result = runner.invoke(app, ["search", "--all-libraries", "--semantic", "test"])
+        assert result.exit_code == 0
+        assert "Warning: skipping Broken Lib" in result.output
+        assert "connection refused" in result.output
+
+
+class TestLibrariesIndexStatus:
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli._discover_libraries")
+    def test_shows_indexed_count(self, mock_discover, mock_import_sem):
+        mock_sem = MagicMock()
+        mock_import_sem.return_value = mock_sem
+
+        mock_zot = MagicMock()
+        mock_zot.num_items.return_value = 100
+        mock_discover.return_value = [
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot,
+            },
+        ]
+        mock_sem.get_index_status.return_value = {"count": 50}
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 0
+        assert "Indexed" in result.output
+        assert "50" in result.output
+
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli._discover_libraries")
+    def test_no_semantic_shows_dash(self, mock_discover, mock_import_sem):
+        mock_import_sem.return_value = None
+
+        mock_zot = MagicMock()
+        mock_zot.num_items.return_value = 100
+        mock_discover.return_value = [
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot,
+            },
+        ]
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 0
+        lines = result.output.strip().split("\n")
+        data_line = lines[2]
+        assert "-" in data_line
+
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli._discover_libraries")
+    def test_mixed_indexed_unindexed(self, mock_discover, mock_import_sem):
+        mock_sem = MagicMock()
+        mock_import_sem.return_value = mock_sem
+
+        mock_zot1 = MagicMock()
+        mock_zot1.num_items.return_value = 100
+        mock_zot2 = MagicMock()
+        mock_zot2.num_items.return_value = 50
+
+        mock_discover.return_value = [
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot1,
+            },
+            {
+                "name": "Lab Group",
+                "id": "999",
+                "type": "group",
+                "source": "local",
+                "client": mock_zot2,
+            },
+        ]
+
+        def index_side_effect(collection_name):
+            if collection_name == "user_0":
+                return {"count": 75}
+            return {"count": 0}
+
+        mock_sem.get_index_status.side_effect = index_side_effect
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 0
+        lines = result.output.strip().split("\n")
+        assert "75" in lines[2]
+        assert "-" in lines[3]
+
+    @patch("riszotto.cli._import_semantic")
+    @patch("riszotto.cli._discover_libraries")
+    def test_index_error_warns_to_stderr(self, mock_discover, mock_import_sem):
+        mock_sem = MagicMock()
+        mock_import_sem.return_value = mock_sem
+        mock_sem.get_index_status.side_effect = RuntimeError("db corrupt")
+
+        mock_zot = MagicMock()
+        mock_zot.num_items.return_value = 10
+        mock_discover.return_value = [
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot,
+            },
+        ]
+
+        result = runner.invoke(app, ["libraries"])
+        assert result.exit_code == 0
+        assert "Warning: index check failed" in result.output
+        assert "db corrupt" in result.output

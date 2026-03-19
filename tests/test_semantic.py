@@ -1,7 +1,10 @@
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from riszotto.semantic import (
     _build_document_text,
+    _get_collection,
     build_index,
     get_index_status,
     semantic_search,
@@ -322,6 +325,38 @@ class TestGetIndexStatus:
         status = get_index_status()
         assert status["count"] == 0
         assert status["path"] == str(INDEX_DIR)
+
+
+class TestGetCollectionErrorHandling:
+    @patch("chromadb.PersistentClient")
+    def test_rebuild_catches_value_error(self, mock_persistent_client):
+        mock_client = mock_persistent_client.return_value
+        mock_client.delete_collection.side_effect = ValueError("not found")
+        mock_collection = MagicMock()
+        mock_client.get_or_create_collection.return_value = mock_collection
+
+        result = _get_collection(rebuild=True, collection_name="test")
+        assert result == mock_collection
+
+    @patch("chromadb.PersistentClient")
+    def test_rebuild_catches_not_found_error(self, mock_persistent_client):
+        from chromadb.errors import NotFoundError
+
+        mock_client = mock_persistent_client.return_value
+        mock_client.delete_collection.side_effect = NotFoundError("not found")
+        mock_collection = MagicMock()
+        mock_client.get_or_create_collection.return_value = mock_collection
+
+        result = _get_collection(rebuild=True, collection_name="test")
+        assert result == mock_collection
+
+    @patch("chromadb.PersistentClient")
+    def test_rebuild_propagates_other_errors(self, mock_persistent_client):
+        mock_client = mock_persistent_client.return_value
+        mock_client.delete_collection.side_effect = RuntimeError("unexpected")
+
+        with pytest.raises(RuntimeError, match="unexpected"):
+            _get_collection(rebuild=True, collection_name="test")
 
 
 class TestCollectionNaming:
