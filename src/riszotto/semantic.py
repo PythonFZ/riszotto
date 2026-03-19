@@ -50,6 +50,7 @@ def _get_collection(*, rebuild: bool = False, collection_name: str = "user_0"):
     """
     import chromadb
     from chromadb.config import Settings
+    from chromadb.errors import NotFoundError
 
     client = chromadb.PersistentClient(
         path=str(INDEX_DIR),
@@ -59,7 +60,7 @@ def _get_collection(*, rebuild: bool = False, collection_name: str = "user_0"):
     if rebuild:
         try:
             client.delete_collection(name=collection_name)
-        except ValueError:
+        except (ValueError, NotFoundError):
             pass
 
     return client.get_or_create_collection(

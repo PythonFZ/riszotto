@@ -26,10 +26,12 @@ Commands default to the personal library. Use `--library` / `-L` to target a dif
 |------|---------|
 | List available libraries | `uvx riszotto libraries` |
 | Search by keywords | `uvx riszotto search "query terms"` |
+| Search all libraries | `uvx riszotto search -A "query terms"` |
 | Search a group library | `uvx riszotto search -L "My Group" "query"` |
 | Search all fields | `uvx riszotto search --full-text "query"` |
 | Semantic search | `uvx riszotto search --semantic "natural language query"` |
 | Filter by author | `uvx riszotto search "topic" --author "LastName"` |
+| Fuzzy author match | `uvx riszotto search "topic" --author "LastName" --fuzzy` |
 | Filter by tag | `uvx riszotto search "topic" --tag "tagname"` |
 | Read a paper | `uvx riszotto show <KEY>` |
 | Search within PDF | `uvx riszotto show <KEY> --search "term"` |
@@ -37,6 +39,23 @@ Commands default to the personal library. Use `--library` / `-L` to target a dif
 | List collections | `uvx riszotto collections` |
 | Recent papers | `uvx riszotto recent` |
 | Build semantic index | `uvx riszotto index` |
+
+## Search Strategy
+
+When searching for papers, follow this cascade:
+
+1. **Keyword search** (default) — fast, precise for known titles/authors
+2. **`--full-text`** — if 0 results from keyword search, retry with this flag (searches all metadata fields)
+3. **`--semantic`** — for natural language queries ("how do transformers handle long sequences"); requires a built index
+4. **`--all-libraries` / `-A`** — search across all accessible libraries at once
+
+Tips for better results:
+- Reduce search terms if getting 0 results — keyword mode uses AND logic, so more terms = fewer hits
+- Use `--max-value-size 0` to see full abstracts when evaluating relevance
+- Use `--author "name"` to filter by author; diacritics are handled automatically ("schafer" matches "Schäfer")
+- Add `--fuzzy` with `--author` if unsure about exact spelling (Levenshtein distance <= 2)
+- Use `show <KEY> --search "term"` to find specific values within a paper's PDF
+- Check `libraries` output for the `Indexed` column before using `--semantic`
 
 ## Group Libraries
 
@@ -95,12 +114,12 @@ uvx riszotto search --semantic "how do transformers handle long sequences"
 ### libraries
 `uvx riszotto libraries`
 
-Lists all accessible libraries with name, ID, type, item count, and source (local/remote).
+Lists all accessible libraries with name, ID, type, item count, semantic index status, and source (local/remote).
 
 ### search
 `uvx riszotto search [OPTIONS] TERMS...`
 
-Key options: `--full-text`, `--semantic`, `--author NAME`, `--tag TAG` (repeatable, AND logic), `--item-type TYPE`, `--since DATE`, `--sort FIELD`, `--direction asc|desc`, `--limit N`, `--page N`, `--library NAME_OR_ID`
+Key options: `--full-text`, `--semantic`, `--author NAME`, `--fuzzy` (with `--author`), `--tag TAG` (repeatable, AND logic), `--item-type TYPE`, `--since DATE`, `--sort FIELD`, `--direction asc|desc`, `--limit N`, `--page N`, `--library NAME_OR_ID`, `--all-libraries` / `-A`
 
 Output: JSON with `results` array containing `key`, `title`, `authors`, `abstract`, `tags`, and pagination metadata.
 

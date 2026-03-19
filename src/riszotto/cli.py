@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 from typing import Annotated, Optional
 
 import typer
@@ -70,12 +71,53 @@ def _collection_name(zot: zotero.Zotero) -> str:
     return f"group_{zot.library_id}"
 
 
-def _matches_author(item: dict, author: str) -> bool:
-    """Check if any creator name contains the author substring (case-insensitive)."""
-    needle = author.lower()
+def _strip_diacritics(text: str) -> str:
+    """Normalize unicode and strip diacritical marks for comparison."""
+    nfkd = unicodedata.normalize("NFKD", text)
+    return "".join(
+        c for c in nfkd if not unicodedata.category(c).startswith("M")
+    ).lower()
+
+
+def _levenshtein(s: str, t: str) -> int:
+    """Compute Levenshtein edit distance between two strings."""
+    if len(s) < len(t):
+        return _levenshtein(t, s)
+    if not t:
+        return len(s)
+    prev = list(range(len(t) + 1))
+    for i, sc in enumerate(s):
+        curr = [i + 1]
+        for j, tc in enumerate(t):
+            cost = 0 if sc == tc else 1
+            curr.append(min(prev[j + 1] + 1, curr[j] + 1, prev[j] + cost))
+        prev = curr
+    return prev[-1]
+
+
+def _fuzzy_substring_match(needle: str, haystack: str, max_distance: int = 2) -> bool:
+    """Check if needle appears as a fuzzy substring in haystack."""
+    if len(needle) > len(haystack):
+        return _levenshtein(needle, haystack) <= max_distance
+    for i in range(len(haystack) - len(needle) + 1):
+        window = haystack[i : i + len(needle)]
+        if _levenshtein(needle, window) <= max_distance:
+            return True
+    return False
+
+
+def _matches_author(item: dict, author: str, *, fuzzy: bool = False) -> bool:
+    """Check if any creator name matches the author query.
+
+    Default: diacritic-insensitive substring match.
+    With fuzzy=True: also allows Levenshtein distance <= 2.
+    """
+    needle = _strip_diacritics(author)
     for creator in item.get("data", {}).get("creators", []):
-        name = format_creator(creator).lower()
+        name = _strip_diacritics(format_creator(creator))
         if needle in name:
+            return True
+        if fuzzy and _fuzzy_substring_match(needle, name):
             return True
     return False
 
@@ -106,6 +148,136 @@ def _format_result(item: dict, max_value_size: int) -> dict:
         "tags": [t["tag"] for t in data.get("tags", [])],
     }
     return _filter_long_values(result, max_value_size)
+
+
+def _discover_libraries() -> list[tuple[str, zotero.Zotero]]:
+    """Discover all accessible libraries and return (name, client) pairs."""
+    config = load_config()
+    libs: list[tuple[str, zotero.Zotero]] = []
+    seen_ids: set[int] = set()
+
+    try:
+        local_zot = get_client()
+        libs.append(("My Library", local_zot))
+        for group in local_zot.groups():
+            seen_ids.add(group["id"])
+            try:
+                group_zot = zotero.Zotero(
+                    library_id=str(group["id"]),
+                    library_type="group",
+                    local=True,
+                )
+                libs.append((group["data"]["name"], group_zot))
+            except (ConnectionError, OSError, PyZoteroError):
+                pass
+    except (ConnectionError, OSError, PyZoteroError):
+        pass
+
+    if config.has_remote_credentials:
+        try:
+            remote = zotero.Zotero(
+                library_id=config.user_id,
+                library_type="user",
+                api_key=config.api_key,
+            )
+            for group in remote.groups():
+                if group["id"] not in seen_ids:
+                    group_zot = zotero.Zotero(
+                        library_id=str(group["id"]),
+                        library_type="group",
+                        api_key=config.api_key,
+                    )
+                    libs.append((group["data"]["name"], group_zot))
+        except (ConnectionError, OSError, PyZoteroError):
+            pass
+
+    return libs
+
+
+def _search_all_libraries(
+    *,
+    terms: list[str],
+    full_text: bool,
+    semantic: bool,
+    limit: int,
+    page: int,
+    max_value_size: int,
+    tag: list[str] | None,
+    item_type: str | None,
+    since: str | None,
+    sort: str | None,
+    direction: str | None,
+    author: str | None,
+    fuzzy: bool,
+) -> None:
+    """Search across all libraries and output grouped results."""
+    query = " ".join(terms)
+    libs = _discover_libraries()
+
+    if not libs:
+        typer.echo("No accessible libraries found.", err=True)
+        raise typer.Exit(1)
+
+    sem = None
+    if semantic:
+        sem = _import_semantic()
+        if sem is None:
+            typer.echo(
+                "Semantic search extras not installed. Run: uv pip install riszotto[semantic]",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+    grouped: dict[str, dict] = {}
+
+    for lib_name, zot in libs:
+        if semantic:
+            col = _collection_name(zot)
+            try:
+                status = sem.get_index_status(collection_name=col)
+                if status["count"] == 0:
+                    continue
+            except Exception:
+                continue
+            hits = sem.semantic_search(query, limit=limit, collection_name=col)
+            results = []
+            for hit in hits:
+                item = zot.item(hit["key"])
+                if author and not _matches_author(item, author, fuzzy=fuzzy):
+                    continue
+                formatted = _format_result(item, max_value_size)
+                formatted["score"] = hit["score"]
+                results.append(formatted)
+        else:
+            start = (page - 1) * limit
+            raw = search_items(
+                zot,
+                query,
+                full_text=full_text,
+                limit=limit,
+                start=start,
+                tag=tag,
+                item_type=item_type,
+                since=since,
+                sort=sort,
+                direction=direction,
+            )
+            if author:
+                raw = [
+                    item for item in raw if _matches_author(item, author, fuzzy=fuzzy)
+                ]
+            results = [_format_result(item, max_value_size) for item in raw]
+
+        if results:
+            envelope = {
+                "page": page if not semantic else 1,
+                "limit": limit,
+                "start": (page - 1) * limit if not semantic else 0,
+                "results": results,
+            }
+            grouped[lib_name] = envelope
+
+    typer.echo(json.dumps(grouped, indent=2))
 
 
 @app.command()
@@ -158,12 +330,49 @@ def search(
         Optional[str],
         typer.Option(
             "--author",
-            help="Filter results by author name (case-insensitive substring match)",
+            help="Filter by author name (diacritic-insensitive substring match)",
         ),
     ] = None,
+    fuzzy: Annotated[
+        bool,
+        typer.Option(
+            "--fuzzy",
+            help="Use fuzzy matching for --author (Levenshtein distance <= 2)",
+        ),
+    ] = False,
     library: LibraryOption = None,
+    all_libraries: Annotated[
+        bool,
+        typer.Option(
+            "--all-libraries",
+            "-A",
+            help="Search across all accessible libraries",
+        ),
+    ] = False,
 ) -> None:
     """Search for papers in your Zotero library."""
+    if all_libraries and library:
+        typer.echo("--all-libraries and --library are mutually exclusive.", err=True)
+        raise typer.Exit(1)
+
+    if all_libraries:
+        _search_all_libraries(
+            terms=terms,
+            full_text=full_text,
+            semantic=semantic,
+            limit=limit,
+            page=page,
+            max_value_size=max_value_size,
+            tag=tag,
+            item_type=item_type,
+            since=since,
+            sort=sort,
+            direction=direction,
+            author=author,
+            fuzzy=fuzzy,
+        )
+        return
+
     query = " ".join(terms)
 
     if semantic:
@@ -189,7 +398,7 @@ def search(
         results = []
         for hit in hits:
             item = zot.item(hit["key"])
-            if author and not _matches_author(item, author):
+            if author and not _matches_author(item, author, fuzzy=fuzzy):
                 continue
             formatted = _format_result(item, max_value_size)
             formatted["score"] = hit["score"]
@@ -220,7 +429,9 @@ def search(
     )
 
     if author:
-        results = [item for item in results if _matches_author(item, author)]
+        results = [
+            item for item in results if _matches_author(item, author, fuzzy=fuzzy)
+        ]
 
     envelope = {
         "page": page,
@@ -586,11 +797,26 @@ def libraries() -> None:
         except (ConnectionError, OSError, PyZoteroError) as e:
             typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
 
+    # Add index status
+    sem = _import_semantic()
+    for lib in libs:
+        if sem is None:
+            lib["indexed"] = "-"
+        else:
+            col = "user_0" if lib["type"] == "user" else f"group_{lib['id']}"
+            try:
+                status = sem.get_index_status(collection_name=col)
+                lib["indexed"] = status["count"] if status["count"] > 0 else "-"
+            except Exception:
+                lib["indexed"] = "-"
+
     # Format as markdown table
-    header = f"{'Name':<30} {'ID':<10} {'Type':<8} {'Items':<8} {'Source'}"
+    header = (
+        f"{'Name':<30} {'ID':<10} {'Type':<8} {'Items':<8} {'Indexed':<8} {'Source'}"
+    )
     lines = [header, "-" * len(header)]
     for lib in libs:
         lines.append(
-            f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {str(lib['items']):<8} {lib['source']}"
+            f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {str(lib['items']):<8} {str(lib['indexed']):<8} {lib['source']}"
         )
     typer.echo("\n".join(lines))

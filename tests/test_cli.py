@@ -1230,3 +1230,164 @@ class TestLibraryFlag:
         mock_semantic.get_index_status.assert_called_once_with(
             collection_name="group_987"
         )
+
+
+class TestFuzzyAuthorMatching:
+    @patch("riszotto.cli.get_client")
+    def test_diacritic_insensitive_by_default(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = [
+            {
+                "data": {
+                    "key": "P1",
+                    "title": "ML Force Fields",
+                    "itemType": "journalArticle",
+                    "date": "2023",
+                    "abstractNote": "",
+                    "creators": [
+                        {
+                            "firstName": "Ioan-Bogdan",
+                            "lastName": "Magdău",
+                            "creatorType": "author",
+                        }
+                    ],
+                    "tags": [],
+                },
+            },
+        ]
+        result = runner.invoke(app, ["search", "--author", "magdau", "ML"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["results"]) == 1
+
+    @patch("riszotto.cli.get_client")
+    def test_fuzzy_needed_for_typo(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = [
+            {
+                "data": {
+                    "key": "P1",
+                    "title": "Paper",
+                    "itemType": "journalArticle",
+                    "date": "2023",
+                    "abstractNote": "",
+                    "creators": [
+                        {
+                            "firstName": "Ioan-Bogdan",
+                            "lastName": "Magdău",
+                            "creatorType": "author",
+                        }
+                    ],
+                    "tags": [],
+                },
+            },
+        ]
+        # "magdeu" is a typo — not a substring of "magdau", needs --fuzzy
+        result = runner.invoke(app, ["search", "--author", "magdeu", "ML"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["results"]) == 0
+
+    @patch("riszotto.cli.get_client")
+    def test_fuzzy_flag_matches_typo(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = [
+            {
+                "data": {
+                    "key": "P1",
+                    "title": "Paper",
+                    "itemType": "journalArticle",
+                    "date": "2023",
+                    "abstractNote": "",
+                    "creators": [
+                        {
+                            "firstName": "Ioan-Bogdan",
+                            "lastName": "Magdău",
+                            "creatorType": "author",
+                        }
+                    ],
+                    "tags": [],
+                },
+            },
+        ]
+        result = runner.invoke(app, ["search", "--author", "bogdau", "--fuzzy", "ML"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["results"]) == 1
+
+    @patch("riszotto.cli.get_client")
+    def test_umlaut_matching(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = [
+            {
+                "data": {
+                    "key": "P1",
+                    "title": "Paper",
+                    "itemType": "journalArticle",
+                    "date": "2023",
+                    "abstractNote": "",
+                    "creators": [
+                        {
+                            "firstName": "Moritz",
+                            "lastName": "Schäfer",
+                            "creatorType": "author",
+                        }
+                    ],
+                    "tags": [],
+                },
+            },
+        ]
+        result = runner.invoke(app, ["search", "--author", "schafer", "ML"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["results"]) == 1
+
+
+class TestAllLibrariesSearch:
+    def test_mutually_exclusive_with_library(self):
+        result = runner.invoke(
+            app, ["search", "--all-libraries", "--library", "Lab", "test"]
+        )
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.output.lower()
+
+    @patch("riszotto.cli._discover_libraries")
+    def test_grouped_output(self, mock_discover):
+        mock_zot1 = MagicMock()
+        mock_zot1.items.return_value = [
+            {
+                "data": {
+                    "key": "K1",
+                    "title": "Paper One",
+                    "itemType": "journalArticle",
+                    "date": "2023",
+                    "abstractNote": "",
+                    "creators": [],
+                    "tags": [],
+                },
+            },
+        ]
+        mock_zot2 = MagicMock()
+        mock_zot2.items.return_value = []
+        mock_discover.return_value = [
+            ("My Library", mock_zot1),
+            ("Empty Group", mock_zot2),
+        ]
+
+        result = runner.invoke(app, ["search", "--all-libraries", "test"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert "My Library" in parsed
+        assert "Empty Group" not in parsed
+        assert len(parsed["My Library"]["results"]) == 1
+
+    @patch("riszotto.cli._discover_libraries")
+    def test_no_libraries_found(self, mock_discover):
+        mock_discover.return_value = []
+        result = runner.invoke(app, ["search", "--all-libraries", "test"])
+        assert result.exit_code == 1
+        assert "no accessible" in result.output.lower()
