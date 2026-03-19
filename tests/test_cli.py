@@ -1472,13 +1472,17 @@ class TestAllLibrariesSearch:
         mock_zot.library_id = "999"
 
         mock_discover.return_value = [
-            {"name": "Broken Lib", "id": "999", "type": "group", "source": "local", "client": mock_zot},
+            {
+                "name": "Broken Lib",
+                "id": "999",
+                "type": "group",
+                "source": "local",
+                "client": mock_zot,
+            },
         ]
         mock_sem.get_index_status.side_effect = RuntimeError("connection refused")
 
-        result = runner.invoke(
-            app, ["search", "--all-libraries", "--semantic", "test"]
-        )
+        result = runner.invoke(app, ["search", "--all-libraries", "--semantic", "test"])
         assert result.exit_code == 0
         assert "Warning: skipping Broken Lib" in result.output
         assert "connection refused" in result.output
@@ -1583,7 +1587,13 @@ class TestLibrariesIndexStatus:
         mock_zot = MagicMock()
         mock_zot.num_items.return_value = 10
         mock_discover.return_value = [
-            {"name": "My Library", "id": "0", "type": "user", "source": "local", "client": mock_zot},
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot,
+            },
         ]
 
         result = runner.invoke(app, ["libraries"])
