@@ -42,8 +42,8 @@ def _build_document_text(item: dict) -> str:
     return " ".join(parts)
 
 
-def _get_collection(*, rebuild: bool = False):
-    """Get or create the ChromaDB collection.
+def _get_collection(*, rebuild: bool = False, collection_name: str = "user_0"):
+    """Get or create a ChromaDB collection by name.
 
     ChromaDB is imported inside this function so the base package
     works without the [semantic] extras installed.
@@ -58,25 +58,29 @@ def _get_collection(*, rebuild: bool = False):
 
     if rebuild:
         try:
-            client.delete_collection(name="zotero")
+            client.delete_collection(name=collection_name)
         except ValueError:
             pass
 
     return client.get_or_create_collection(
-        name="zotero",
+        name=collection_name,
         metadata={"hnsw:space": "cosine"},
     )
 
 
 def build_index(
-    zot, *, rebuild: bool = False, limit: int | None = None
+    zot,
+    *,
+    rebuild: bool = False,
+    limit: int | None = None,
+    collection_name: str = "user_0",
 ) -> dict[str, int]:
     """Build or update the semantic search index.
 
     Fetches items from Zotero and upserts their text into ChromaDB.
     In incremental mode (rebuild=False), skips items already in the index.
     """
-    collection = _get_collection(rebuild=rebuild)
+    collection = _get_collection(rebuild=rebuild, collection_name=collection_name)
 
     if limit is not None:
         items = zot.top(limit=limit)
@@ -103,7 +107,7 @@ def build_index(
     metas_to_upsert: list[dict] = []
     skipped = 0
 
-    for item in tqdm(top_level, desc="Processing items", unit="item"):
+    for item in top_level:
         data = item.get("data", {})
         key = data.get("key", "")
 
@@ -139,12 +143,14 @@ def build_index(
     return {"indexed": len(ids_to_upsert), "skipped": skipped}
 
 
-def semantic_search(query: str, *, limit: int = 10) -> list[dict]:
+def semantic_search(
+    query: str, *, limit: int = 10, collection_name: str = "user_0"
+) -> list[dict]:
     """Query the semantic index and return ranked results.
 
     Converts ChromaDB distances to similarity scores (1 - distance).
     """
-    collection = _get_collection()
+    collection = _get_collection(collection_name=collection_name)
 
     if collection.count() == 0:
         return []
@@ -171,9 +177,9 @@ def semantic_search(query: str, *, limit: int = 10) -> list[dict]:
     return output
 
 
-def get_index_status() -> dict:
+def get_index_status(*, collection_name: str = "user_0") -> dict:
     """Return the current state of the semantic index."""
-    collection = _get_collection()
+    collection = _get_collection(collection_name=collection_name)
     return {
         "count": collection.count(),
         "path": str(INDEX_DIR),

@@ -8,9 +8,12 @@ from typing import Annotated, Optional
 import typer
 from markitdown import MarkItDown
 from pyzotero import zotero
+from pyzotero.zotero_errors import PyZoteroError
 
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
+    AmbiguousLibraryError,
+    LibraryNotFoundError,
     collection_items,
     get_client,
     get_item_bibtex,
@@ -20,9 +23,19 @@ from riszotto.client import (
     recent_items,
     search_items,
 )
+from riszotto.config import load_config
 from riszotto.formatting import format_creator
 
 app = typer.Typer(add_completion=False)
+
+LibraryOption = Annotated[
+    Optional[str],
+    typer.Option(
+        "--library",
+        "-L",
+        help="Group library name or ID (default: personal library)",
+    ),
+]
 
 
 def _import_semantic():
@@ -35,18 +48,26 @@ def _import_semantic():
         return None
 
 
-def _get_zot() -> zotero.Zotero:
+def _get_zot(library: str | None = None) -> zotero.Zotero:
     """Get Zotero client, raising typer.Exit on connection failure."""
     try:
-        return get_client()
-    except (ConnectionError, Exception) as e:
-        if "connection" in str(e).lower() or "refused" in str(e).lower():
-            typer.echo(
-                "Zotero desktop is not running. Start Zotero and ensure the local API is enabled.",
-                err=True,
-            )
-            raise typer.Exit(1)
-        raise
+        return get_client(library=library)
+    except (LibraryNotFoundError, AmbiguousLibraryError) as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    except ConnectionError:
+        typer.echo(
+            "Zotero desktop is not running. Start Zotero and ensure the local API is enabled.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+
+def _collection_name(zot: zotero.Zotero) -> str:
+    """Derive ChromaDB collection name from the resolved Zotero client."""
+    if zot.library_type in ("user", "users"):
+        return "user_0"
+    return f"group_{zot.library_id}"
 
 
 def _matches_author(item: dict, author: str) -> bool:
@@ -140,6 +161,7 @@ def search(
             help="Filter results by author name (case-insensitive substring match)",
         ),
     ] = None,
+    library: LibraryOption = None,
 ) -> None:
     """Search for papers in your Zotero library."""
     query = " ".join(terms)
@@ -153,8 +175,17 @@ def search(
             )
             raise typer.Exit(1)
 
-        zot = _get_zot()
-        hits = sem.semantic_search(query, limit=limit)
+        zot = _get_zot(library=library)
+        col = _collection_name(zot)
+        status = sem.get_index_status(collection_name=col)
+        if status["count"] == 0:
+            lib_hint = f' --library "{library}"' if library else ""
+            typer.echo(
+                f"No semantic index found. Build one first: riszotto index{lib_hint}",
+                err=True,
+            )
+            raise typer.Exit(1)
+        hits = sem.semantic_search(query, limit=limit, collection_name=col)
         results = []
         for hit in hits:
             item = zot.item(hit["key"])
@@ -174,7 +205,7 @@ def search(
         return
 
     start = (page - 1) * limit
-    zot = _get_zot()
+    zot = _get_zot(library=library)
     results = search_items(
         zot,
         query,
@@ -218,9 +249,10 @@ def show(
         int,
         typer.Option("--context", "-C", help="Context lines around each search match"),
     ] = 3,
+    library: LibraryOption = None,
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
-    zot = _get_zot()
+    zot = _get_zot(library=library)
 
     pdfs = get_pdf_attachments(zot, key)
     if not pdfs:
@@ -237,13 +269,27 @@ def show(
     selected = pdfs[attachment - 1]
     file_path = get_pdf_path(selected)
     if not file_path:
-        typer.echo("Could not determine local file path for attachment.", err=True)
+        if library:
+            typer.echo(
+                "PDF not available locally. The group is accessed via remote API "
+                "and show requires local files. Sync this group in Zotero desktop "
+                "for PDF access.",
+                err=True,
+            )
+        else:
+            typer.echo("Could not determine local file path for attachment.", err=True)
         raise typer.Exit(1)
 
     try:
-        md = MarkItDown()
-        result = md.convert(file_path)
-        markdown = result.markdown
+        import logging
+
+        logging.disable(logging.CRITICAL)
+        try:
+            md = MarkItDown()
+            result = md.convert(file_path)
+            markdown = result.markdown
+        finally:
+            logging.disable(logging.NOTSET)
     except Exception as e:
         typer.echo(f"Failed to convert PDF to markdown: {e}", err=True)
         raise typer.Exit(1)
@@ -256,7 +302,7 @@ def show(
         typer.echo(output)
         return
 
-    _show_paginated(markdown, page, page_size, key)
+    _show_paginated(markdown, page, page_size, key, library=library)
 
 
 @app.command()
@@ -272,9 +318,10 @@ def export(
     include_all: Annotated[
         bool, typer.Option("--include-all", help="Don't exclude any fields")
     ] = False,
+    library: LibraryOption = None,
 ) -> None:
     """Export an item in the specified format."""
-    zot = _get_zot()
+    zot = _get_zot(library=library)
     if format == "bibtex":
         excluded = (
             set()
@@ -287,7 +334,14 @@ def export(
         raise typer.Exit(1)
 
 
-def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
+def _show_paginated(
+    markdown: str,
+    page: int,
+    page_size: int,
+    key: str,
+    *,
+    library: str | None = None,
+) -> None:
     """Print a page of markdown lines."""
     lines = markdown.splitlines()
     total_lines = len(lines)
@@ -308,8 +362,9 @@ def _show_paginated(markdown: str, page: int, page_size: int, key: str) -> None:
     typer.echo("\n".join(lines[start:end]))
 
     if total_pages > 1:
+        lib_flag = f' --library "{library}"' if library else ""
         typer.echo(
-            f"\nPage {page}/{total_pages}. Next: riszotto show --page {page + 1} {key}"
+            f"\nPage {page}/{total_pages}. Next: riszotto show{lib_flag} --page {page + 1} {key}"
         )
 
 
@@ -370,9 +425,10 @@ def collections(
             help="Hide string values longer than this (0 = show all)",
         ),
     ] = 200,
+    library: LibraryOption = None,
 ) -> None:
     """List collections or items in a collection."""
-    zot = _get_zot()
+    zot = _get_zot(library=library)
     if key is None:
         cols = list_collections(zot)
         envelope = {
@@ -402,9 +458,10 @@ def recent(
             help="Hide string values longer than this (0 = show all)",
         ),
     ] = 200,
+    library: LibraryOption = None,
 ) -> None:
     """Show recently added papers."""
-    zot = _get_zot()
+    zot = _get_zot(library=library)
     items = recent_items(zot, limit=limit)
     envelope = {
         "limit": limit,
@@ -425,6 +482,7 @@ def index(
         Optional[int],
         typer.Option("--limit", "-l", help="Maximum items to fetch from Zotero"),
     ] = None,
+    library: LibraryOption = None,
 ) -> None:
     """Build or update the semantic search index."""
     semantic = _import_semantic()
@@ -435,11 +493,104 @@ def index(
         )
         raise typer.Exit(1)
 
+    zot = _get_zot(library=library)
+    col = _collection_name(zot)
+
     if status:
-        info = semantic.get_index_status()
+        info = semantic.get_index_status(collection_name=col)
         typer.echo(json.dumps(info, indent=2))
         return
 
-    zot = _get_zot()
-    stats = semantic.build_index(zot, rebuild=rebuild, limit=limit)
+    stats = semantic.build_index(zot, rebuild=rebuild, limit=limit, collection_name=col)
     typer.echo(f"Indexed {stats['indexed']} items ({stats['skipped']} skipped).")
+
+
+@app.command()
+def libraries() -> None:
+    """List available Zotero libraries."""
+    config = load_config()
+    libs: list[dict] = []
+    seen_ids: set[int] = set()
+
+    # Try local groups
+    try:
+        local_zot = get_client()
+        num_personal = local_zot.num_items()
+        libs.append(
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "items": num_personal,
+            }
+        )
+        for group in local_zot.groups():
+            seen_ids.add(group["id"])
+            try:
+                group_zot = zotero.Zotero(
+                    library_id=str(group["id"]),
+                    library_type="group",
+                    local=True,
+                )
+                num = group_zot.num_items()
+            except (ConnectionError, OSError, PyZoteroError):
+                num = "?"
+            libs.append(
+                {
+                    "name": group["data"]["name"],
+                    "id": str(group["id"]),
+                    "type": "group",
+                    "source": "local",
+                    "items": num,
+                }
+            )
+    except (ConnectionError, OSError, PyZoteroError):
+        if not config.has_remote_credentials:
+            typer.echo(
+                "Zotero desktop is not running and no remote config found. "
+                "Start Zotero or configure api_key and user_id in "
+                "~/.riszotto/config.toml.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        libs.append(
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "items": "?",
+            }
+        )
+
+    # Try remote groups
+    if config.has_remote_credentials:
+        try:
+            remote = zotero.Zotero(
+                library_id=config.user_id,
+                library_type="user",
+                api_key=config.api_key,
+            )
+            for group in remote.groups():
+                if group["id"] not in seen_ids:
+                    libs.append(
+                        {
+                            "name": group["data"]["name"],
+                            "id": str(group["id"]),
+                            "type": "group",
+                            "source": "remote",
+                            "items": group.get("meta", {}).get("numItems", "?"),
+                        }
+                    )
+        except (ConnectionError, OSError, PyZoteroError) as e:
+            typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
+
+    # Format as markdown table
+    header = f"{'Name':<30} {'ID':<10} {'Type':<8} {'Items':<8} {'Source'}"
+    lines = [header, "-" * len(header)]
+    for lib in libs:
+        lines.append(
+            f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {str(lib['items']):<8} {lib['source']}"
+        )
+    typer.echo("\n".join(lines))

@@ -222,7 +222,7 @@ class TestBuildIndex:
         result = build_index(mock_zot, rebuild=True)
         assert result["indexed"] == 2
         # rebuild=True is passed to _get_collection
-        mock_get_col.assert_called_once_with(rebuild=True)
+        mock_get_col.assert_called_once_with(rebuild=True, collection_name="user_0")
 
     @patch("riszotto.semantic._get_collection")
     def test_no_items_to_index(self, mock_get_col):
@@ -322,3 +322,49 @@ class TestGetIndexStatus:
         status = get_index_status()
         assert status["count"] == 0
         assert status["path"] == str(INDEX_DIR)
+
+
+class TestCollectionNaming:
+    @patch("riszotto.semantic._get_collection")
+    def test_build_index_uses_collection_name(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 0
+
+        mock_zot = MagicMock()
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = []
+
+        build_index(mock_zot, collection_name="group_999")
+        mock_get_col.assert_called_once_with(rebuild=False, collection_name="group_999")
+
+    @patch("riszotto.semantic._get_collection")
+    def test_semantic_search_uses_collection_name(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 0
+
+        semantic_search("query", collection_name="group_999")
+        mock_get_col.assert_called_once_with(collection_name="group_999")
+
+    @patch("riszotto.semantic._get_collection")
+    def test_get_index_status_uses_collection_name(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 5
+
+        get_index_status(collection_name="group_999")
+        mock_get_col.assert_called_once_with(collection_name="group_999")
+
+    @patch("riszotto.semantic._get_collection")
+    def test_default_collection_name_is_user_0(self, mock_get_col):
+        mock_collection = MagicMock()
+        mock_get_col.return_value = mock_collection
+        mock_collection.count.return_value = 0
+
+        mock_zot = MagicMock()
+        mock_zot.top.return_value = []
+        mock_zot.everything.return_value = []
+
+        build_index(mock_zot)
+        mock_get_col.assert_called_once_with(rebuild=False, collection_name="user_0")
