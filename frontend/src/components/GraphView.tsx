@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import {
   ReactFlow,
   Controls,
@@ -10,15 +10,7 @@ import {
   type Node,
   type Edge,
 } from "@xyflow/react";
-import {
-  forceSimulation,
-  forceLink,
-  forceManyBody,
-  forceCenter,
-  forceCollide,
-  type SimulationNodeDatum,
-  type SimulationLinkDatum,
-} from "d3-force";
+import ELK, { type ElkNode, type ElkExtendedEdge } from "elkjs/lib/elk.bundled.js";
 import "@xyflow/react/dist/style.css";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
@@ -28,6 +20,10 @@ import GraphControls from "./GraphControls";
 import type { GraphData } from "../types";
 
 const nodeTypes = { paper: PaperNode };
+const elk = new ELK();
+
+const NODE_WIDTH = 170;
+const NODE_HEIGHT = 50;
 
 interface GraphViewProps {
   graphData: GraphData | null;
@@ -39,59 +35,41 @@ interface GraphViewProps {
   loading: boolean;
 }
 
-interface SimNode extends SimulationNodeDatum {
-  id: string;
-}
-
-interface SimLink extends SimulationLinkDatum<SimNode> {
-  similarity: number;
-}
-
-function computeLayout(
+async function computeLayout(
   graphData: GraphData,
   onNodeClick: (key: string) => void,
-): { nodes: Node[]; edges: Edge[] } {
-  const simNodes: SimNode[] = graphData.nodes.map((n) => ({
-    id: n.key,
-    x: Math.random() * 500,
-    y: Math.random() * 500,
-  }));
+): Promise<{ nodes: Node[]; edges: Edge[] }> {
+  const elkGraph = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": "RIGHT",
+      "elk.spacing.nodeNode": "80",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "120",
+      "elk.layered.spacing.edgeNodeBetweenLayers": "40",
+      "elk.edgeRouting": "SPLINES",
+    },
+    children: graphData.nodes.map((n) => ({
+      id: n.key,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+    })) as ElkNode[],
+    edges: graphData.edges.map((e, i) => ({
+      id: `e-${e.source}-${e.target}-${i}`,
+      sources: [e.source],
+      targets: [e.target],
+    })) as ElkExtendedEdge[],
+  };
 
-  const simLinks: SimLink[] = graphData.edges.map((e) => ({
-    source: e.source,
-    target: e.target,
-    similarity: e.similarity,
-  }));
-
-  const simulation = forceSimulation<SimNode>(simNodes)
-    .force(
-      "link",
-      forceLink<SimNode, SimLink>(simLinks)
-        .id((d) => d.id)
-        .distance((d) => {
-          // High similarity => shorter distance
-          const sim = d.similarity;
-          return 50 + (1 - sim) * 300;
-        }),
-    )
-    .force("charge", forceManyBody().strength(-200))
-    .force("center", forceCenter(0, 0))
-    .force("collide", forceCollide(60))
-    .stop();
-
-  // Run simulation synchronously
-  for (let i = 0; i < 150; i++) {
-    simulation.tick();
-  }
-
+  const layout = await elk.layout(elkGraph);
   const nodeMap = new Map(graphData.nodes.map((n) => [n.key, n]));
 
-  const nodes: Node[] = simNodes.map((sn) => {
-    const gn = nodeMap.get(sn.id)!;
+  const nodes: Node[] = (layout.children ?? []).map((elkNode) => {
+    const gn = nodeMap.get(elkNode.id)!;
     return {
-      id: sn.id,
+      id: elkNode.id,
       type: "paper",
-      position: { x: sn.x ?? 0, y: sn.y ?? 0 },
+      position: { x: elkNode.x ?? 0, y: elkNode.y ?? 0 },
       data: {
         title: gn.title,
         creators: gn.creators,
@@ -129,6 +107,7 @@ function GraphViewInner({
 }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [layoutLoading, setLayoutLoading] = useState(false);
 
   const stableOnNodeClick = useCallback(
     (key: string) => onNodeClick(key),
@@ -141,13 +120,19 @@ function GraphViewInner({
       setEdges([]);
       return;
     }
-    const layout = computeLayout(graphData, stableOnNodeClick);
-    setNodes(layout.nodes);
-    setEdges(layout.edges);
+    let cancelled = false;
+    setLayoutLoading(true);
+    computeLayout(graphData, stableOnNodeClick).then((layout) => {
+      if (!cancelled) {
+        setNodes(layout.nodes);
+        setEdges(layout.edges);
+        setLayoutLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
   }, [graphData, stableOnNodeClick, setNodes, setEdges]);
 
-  // Empty / loading states
-  if (loading) {
+  if (loading || layoutLoading) {
     return (
       <Box
         sx={{
@@ -183,7 +168,7 @@ function GraphViewInner({
           Search to explore
         </Typography>
         <Typography variant="body2" sx={{ opacity: 0.4 }}>
-          Enter a paper title to build a citation graph
+          Enter a paper title to build a similarity graph
         </Typography>
       </Box>
     );
