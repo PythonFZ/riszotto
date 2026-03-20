@@ -47,9 +47,7 @@ def search(
     # For fulltext/title modes, use the Zotero search API
     try:
         zot = get_client()
-        results = search_items(
-            zot, q, full_text=(mode == "fulltext"), limit=limit
-        )
+        results = search_items(zot, q, full_text=(mode == "fulltext"), limit=limit)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Zotero unavailable: {e}")
 
@@ -111,11 +109,13 @@ def item_detail(item_key: str):
         attachments = get_pdf_attachments(zot, item_key)
         for att in attachments:
             att_key = att.get("key", "")
-            pdf_attachments.append({
-                "key": att_key,
-                "title": att.get("data", {}).get("title", "PDF"),
-                "zoteroLink": f"zotero://open-pdf/library/items/{att_key}",
-            })
+            pdf_attachments.append(
+                {
+                    "key": att_key,
+                    "title": att.get("data", {}).get("title", "PDF"),
+                    "zoteroLink": f"zotero://open-pdf/library/items/{att_key}",
+                }
+            )
     except Exception:
         pass
 

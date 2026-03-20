@@ -1018,7 +1018,11 @@ class TestLibraries:
     @patch("riszotto.client.get_client")
     @patch("riszotto.cli.get_client")
     def test_lists_local_groups(
-        self, mock_cli_get_client, mock_client_get_client, mock_cli_config, mock_client_config
+        self,
+        mock_cli_get_client,
+        mock_client_get_client,
+        mock_cli_config,
+        mock_client_config,
     ):
         from riszotto.config import Config
 
@@ -1087,7 +1091,11 @@ class TestLibraries:
     @patch("riszotto.client.get_client")
     @patch("riszotto.cli.get_client")
     def test_errors_when_local_and_remote_unavailable(
-        self, mock_cli_get_client, mock_client_get_client, mock_cli_config, mock_client_config
+        self,
+        mock_cli_get_client,
+        mock_client_get_client,
+        mock_cli_config,
+        mock_client_config,
     ):
         from riszotto.config import Config
 

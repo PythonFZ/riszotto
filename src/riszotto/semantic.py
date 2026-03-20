@@ -227,15 +227,17 @@ def get_neighbors(
     center_meta = center["metadatas"][0]
     center_embedding = center["embeddings"][0]
 
-    nodes.append({
-        "key": item_key,
-        "title": center_meta.get("title", ""),
-        "itemType": center_meta.get("itemType", ""),
-        "creators": center_meta.get("creators", ""),
-        "date": center_meta.get("date", ""),
-        "depth": 0,
-        "score": 1.0,
-    })
+    nodes.append(
+        {
+            "key": item_key,
+            "title": center_meta.get("title", ""),
+            "itemType": center_meta.get("itemType", ""),
+            "creators": center_meta.get("creators", ""),
+            "date": center_meta.get("date", ""),
+            "depth": 0,
+            "score": 1.0,
+        }
+    )
     seen_keys.add(item_key)
 
     # BFS expansion
@@ -268,23 +270,27 @@ def get_neighbors(
             meta = results["metadatas"][0][i]
             neighbor_embedding = results["embeddings"][0][i]
 
-            edges.append({
-                "source": source_key,
-                "target": neighbor_key,
-                "similarity": similarity,
-            })
+            edges.append(
+                {
+                    "source": source_key,
+                    "target": neighbor_key,
+                    "similarity": similarity,
+                }
+            )
 
             if neighbor_key not in seen_keys:
                 seen_keys.add(neighbor_key)
-                nodes.append({
-                    "key": neighbor_key,
-                    "title": meta.get("title", ""),
-                    "itemType": meta.get("itemType", ""),
-                    "creators": meta.get("creators", ""),
-                    "date": meta.get("date", ""),
-                    "depth": current_depth + 1,
-                    "score": similarity,
-                })
+                nodes.append(
+                    {
+                        "key": neighbor_key,
+                        "title": meta.get("title", ""),
+                        "itemType": meta.get("itemType", ""),
+                        "creators": meta.get("creators", ""),
+                        "date": meta.get("date", ""),
+                        "depth": current_depth + 1,
+                        "score": similarity,
+                    }
+                )
                 frontier.append((neighbor_key, neighbor_embedding, current_depth + 1))
 
     return {"nodes": nodes, "edges": edges}

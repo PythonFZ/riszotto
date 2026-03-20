@@ -265,8 +265,16 @@ class TestBuildIndex:
                     "title": "Test Paper",
                     "itemType": "journalArticle",
                     "creators": [
-                        {"creatorType": "author", "lastName": "Smith", "firstName": "John"},
-                        {"creatorType": "author", "lastName": "Doe", "firstName": "Jane"},
+                        {
+                            "creatorType": "author",
+                            "lastName": "Smith",
+                            "firstName": "John",
+                        },
+                        {
+                            "creatorType": "author",
+                            "lastName": "Doe",
+                            "firstName": "Jane",
+                        },
                     ],
                     "date": "2023-06-15",
                     "abstractNote": "Abstract text.",
@@ -288,7 +296,11 @@ class TestBuildIndex:
             build_index(mock_zot, rebuild=True)
 
         call_args = mock_collection.upsert.call_args
-        metadatas = call_args[1]["metadatas"] if "metadatas" in call_args[1] else call_args[0][2]
+        metadatas = (
+            call_args[1]["metadatas"]
+            if "metadatas" in call_args[1]
+            else call_args[0][2]
+        )
         assert metadatas[0]["creators"] == "Smith, John; Doe, Jane"
         assert metadatas[0]["date"] == "2023-06-15"
         assert metadatas[0]["title"] == "Test Paper"
@@ -354,12 +366,16 @@ class TestSemanticSearch:
         mock_collection.query.return_value = {
             "ids": [["key1"]],
             "distances": [[0.2]],
-            "metadatas": [[{
-                "title": "Test",
-                "itemType": "journalArticle",
-                "creators": "Smith, John",
-                "date": "2023",
-            }]],
+            "metadatas": [
+                [
+                    {
+                        "title": "Test",
+                        "itemType": "journalArticle",
+                        "creators": "Smith, John",
+                        "date": "2023",
+                    }
+                ]
+            ],
         }
 
         results = semantic_search("test query")
@@ -478,22 +494,42 @@ class TestGetNeighbors:
         mock_collection.get.return_value = {
             "ids": ["center_key"],
             "embeddings": [[0.1, 0.2, 0.3]],
-            "metadatas": [{"title": "Center Paper", "itemType": "journalArticle", "creators": "Smith, J", "date": "2020"}],
+            "metadatas": [
+                {
+                    "title": "Center Paper",
+                    "itemType": "journalArticle",
+                    "creators": "Smith, J",
+                    "date": "2020",
+                }
+            ],
         }
 
         # query() returns neighbors
         mock_collection.query.return_value = {
             "ids": [["neighbor1", "neighbor2"]],
             "distances": [[0.15, 0.4]],
-            "metadatas": [[
-                {"title": "Neighbor 1", "itemType": "journalArticle", "creators": "Doe, J", "date": "2021"},
-                {"title": "Neighbor 2", "itemType": "conferencePaper", "creators": "Lee, A", "date": "2019"},
-            ]],
+            "metadatas": [
+                [
+                    {
+                        "title": "Neighbor 1",
+                        "itemType": "journalArticle",
+                        "creators": "Doe, J",
+                        "date": "2021",
+                    },
+                    {
+                        "title": "Neighbor 2",
+                        "itemType": "conferencePaper",
+                        "creators": "Lee, A",
+                        "date": "2019",
+                    },
+                ]
+            ],
             "embeddings": [[[0.2, 0.3, 0.4], [0.5, 0.6, 0.7]]],
         }
 
         with patch("riszotto.semantic._get_collection", return_value=mock_collection):
             from riszotto.semantic import get_neighbors
+
             result = get_neighbors("center_key", cutoff=0.5, depth=1)
 
         assert len(result["nodes"]) == 3  # center + 2 neighbors
@@ -507,20 +543,40 @@ class TestGetNeighbors:
         mock_collection.get.return_value = {
             "ids": ["center"],
             "embeddings": [[0.1, 0.2, 0.3]],
-            "metadatas": [{"title": "Center", "itemType": "journalArticle", "creators": "", "date": ""}],
+            "metadatas": [
+                {
+                    "title": "Center",
+                    "itemType": "journalArticle",
+                    "creators": "",
+                    "date": "",
+                }
+            ],
         }
         mock_collection.query.return_value = {
             "ids": [["n1", "n2"]],
             "distances": [[0.1, 0.8]],  # n2 has low similarity (1-0.8=0.2)
-            "metadatas": [[
-                {"title": "Close", "itemType": "journalArticle", "creators": "", "date": ""},
-                {"title": "Far", "itemType": "journalArticle", "creators": "", "date": ""},
-            ]],
+            "metadatas": [
+                [
+                    {
+                        "title": "Close",
+                        "itemType": "journalArticle",
+                        "creators": "",
+                        "date": "",
+                    },
+                    {
+                        "title": "Far",
+                        "itemType": "journalArticle",
+                        "creators": "",
+                        "date": "",
+                    },
+                ]
+            ],
             "embeddings": [[[0.2, 0.3, 0.4], [0.9, 0.8, 0.7]]],
         }
 
         with patch("riszotto.semantic._get_collection", return_value=mock_collection):
             from riszotto.semantic import get_neighbors
+
             result = get_neighbors("center", cutoff=0.5, depth=1)
 
         # Only n1 passes cutoff (similarity 0.9 > 0.5), n2 doesn't (0.2 < 0.5)
@@ -533,22 +589,42 @@ class TestGetNeighbors:
         mock_collection.get.return_value = {
             "ids": ["center"],
             "embeddings": [[0.1]],
-            "metadatas": [{"title": "Center", "itemType": "journalArticle", "creators": "", "date": ""}],
+            "metadatas": [
+                {
+                    "title": "Center",
+                    "itemType": "journalArticle",
+                    "creators": "",
+                    "date": "",
+                }
+            ],
         }
 
         # Return 60 neighbors (all above cutoff)
         ids = [[f"n{i}" for i in range(60)]]
         distances = [[0.05] * 60]
-        metadatas = [[{"title": f"Paper {i}", "itemType": "journalArticle", "creators": "", "date": ""} for i in range(60)]]
+        metadatas = [
+            [
+                {
+                    "title": f"Paper {i}",
+                    "itemType": "journalArticle",
+                    "creators": "",
+                    "date": "",
+                }
+                for i in range(60)
+            ]
+        ]
         embeddings = [[[0.1] for _ in range(60)]]
 
         mock_collection.query.return_value = {
-            "ids": ids, "distances": distances,
-            "metadatas": metadatas, "embeddings": embeddings,
+            "ids": ids,
+            "distances": distances,
+            "metadatas": metadatas,
+            "embeddings": embeddings,
         }
 
         with patch("riszotto.semantic._get_collection", return_value=mock_collection):
             from riszotto.semantic import get_neighbors
+
             result = get_neighbors("center", cutoff=0.0, depth=1)
 
         assert len(result["nodes"]) <= 50

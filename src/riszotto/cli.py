@@ -691,7 +691,9 @@ def index(
 @app.command()
 def web(
     port: int = typer.Option(8080, "--port", "-p", help="Port to serve on."),
-    no_open: bool = typer.Option(False, "--no-open", help="Don't open browser automatically."),
+    no_open: bool = typer.Option(
+        False, "--no-open", help="Don't open browser automatically."
+    ),
 ) -> None:
     """Launch the web UI for interactive semantic search."""
     try:
@@ -711,6 +713,7 @@ def web(
 
         def open_browser():
             import time
+
             time.sleep(1)
             webbrowser.open(f"http://localhost:{port}")
 

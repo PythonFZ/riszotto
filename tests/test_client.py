@@ -567,6 +567,7 @@ class TestDiscoverLibraries:
             mock_get.return_value = mock_zot
 
             from riszotto.client import discover_libraries
+
             libs = discover_libraries()
 
         assert len(libs) >= 1
@@ -590,6 +591,7 @@ class TestDiscoverLibraries:
             patch("riszotto.client.load_config", return_value=mock_config),
         ):
             from riszotto.client import discover_libraries
+
             libs = discover_libraries()
 
         group_libs = [l for l in libs if l["type"] == "group"]

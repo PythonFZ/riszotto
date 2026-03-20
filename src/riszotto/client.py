@@ -191,13 +191,15 @@ def discover_libraries() -> list[dict[str, Any]]:
     seen_group_ids: set[int] = set()
 
     # Personal library is always present
-    libraries.append({
-        "name": "My Library",
-        "id": "0",
-        "type": "user",
-        "source": "local",
-        "collection_name": "user_0",
-    })
+    libraries.append(
+        {
+            "name": "My Library",
+            "id": "0",
+            "type": "user",
+            "source": "local",
+            "collection_name": "user_0",
+        }
+    )
 
     # Local groups
     try:
@@ -207,13 +209,15 @@ def discover_libraries() -> list[dict[str, Any]]:
             gname = group.get("data", {}).get("name", f"Group {gid}")
             if gid and gid not in seen_group_ids:
                 seen_group_ids.add(gid)
-                libraries.append({
-                    "name": gname,
-                    "id": str(gid),  # always string for consistency
-                    "type": "group",
-                    "source": "local",
-                    "collection_name": f"group_{gid}",
-                })
+                libraries.append(
+                    {
+                        "name": gname,
+                        "id": str(gid),  # always string for consistency
+                        "type": "group",
+                        "source": "local",
+                        "collection_name": f"group_{gid}",
+                    }
+                )
     except Exception:
         pass  # Local API may not be running
 
@@ -223,13 +227,15 @@ def discover_libraries() -> list[dict[str, Any]]:
         gname = group.get("data", {}).get("name", f"Group {gid}")
         if gid and gid not in seen_group_ids:
             seen_group_ids.add(gid)
-            libraries.append({
-                "name": gname,
-                "id": str(gid),  # always string for consistency
-                "type": "group",
-                "source": "remote",
-                "collection_name": f"group_{gid}",
-            })
+            libraries.append(
+                {
+                    "name": gname,
+                    "id": str(gid),  # always string for consistency
+                    "type": "group",
+                    "source": "remote",
+                    "collection_name": f"group_{gid}",
+                }
+            )
 
     return libraries
 
