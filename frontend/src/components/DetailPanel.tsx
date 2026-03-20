@@ -10,7 +10,7 @@ import Skeleton from "@mui/material/Skeleton";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import type { Paper, PaperDetail } from "../types";
-import { getItemDetail } from "../api";
+import { getItemDetail, getBibtex } from "../api";
 
 interface DetailPanelProps {
   paper: Paper | null;
@@ -161,7 +161,14 @@ export default function DetailPanel({ paper }: DetailPanelProps) {
             size="small"
             variant="outlined"
             startIcon={<ContentCopyIcon />}
-            onClick={() => navigator.clipboard.writeText(`@article{${paper.key}}`)}
+            onClick={async () => {
+              try {
+                const bibtex = await getBibtex(paper.key);
+                await navigator.clipboard.writeText(bibtex);
+              } catch {
+                await navigator.clipboard.writeText(`@article{${paper.key}}`);
+              }
+            }}
             sx={{ textTransform: "none", fontSize: 12 }}
           >
             BibTeX

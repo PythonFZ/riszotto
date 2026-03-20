@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from riszotto.client import discover_libraries, get_client, get_item
+from riszotto.client import (
+    discover_libraries,
+    get_client,
+    get_item,
+    get_item_bibtex,
+    get_pdf_attachments,
+)
 from riszotto.semantic import get_index_status, get_neighbors, semantic_search
 
 router = APIRouter()
@@ -57,6 +63,19 @@ def item_detail(item_key: str):
         elif c.get("name"):
             authors.append(c["name"])
 
+    pdf_attachments = []
+    try:
+        attachments = get_pdf_attachments(zot, item_key)
+        for att in attachments:
+            att_key = att.get("key", "")
+            pdf_attachments.append({
+                "key": att_key,
+                "title": att.get("data", {}).get("title", "PDF"),
+                "zoteroLink": f"zotero://open-pdf/library/items/{att_key}",
+            })
+    except Exception:
+        pass
+
     return {
         "key": raw.get("key", item_key),
         "title": data.get("title", ""),
@@ -65,8 +84,20 @@ def item_detail(item_key: str):
         "tags": [t.get("tag", "") for t in data.get("tags", [])],
         "date": data.get("date", ""),
         "itemType": data.get("itemType", ""),
-        "zoteroLink": f"zotero://select/items/{item_key}",
+        "zoteroLink": f"zotero://select/library/items/{item_key}",
+        "attachments": pdf_attachments,
     }
+
+
+@router.get("/item/{item_key}/bibtex")
+def item_bibtex(item_key: str):
+    """Get BibTeX entry for a paper."""
+    try:
+        zot = get_client()
+        bibtex = get_item_bibtex(zot, item_key)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Zotero unavailable: {e}")
+    return {"bibtex": bibtex}
 
 
 @router.get("/status")

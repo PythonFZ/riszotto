@@ -75,13 +75,27 @@ class TestItemEndpoint:
         with (
             patch("riszotto.api.routes.get_client", return_value=MagicMock()),
             patch("riszotto.api.routes.get_item", return_value=mock_item),
+            patch("riszotto.api.routes.get_pdf_attachments", return_value=[]),
         ):
             response = client.get("/api/item/ABC123")
         assert response.status_code == 200
         data = response.json()
         assert data["title"] == "Test Paper"
         assert data["authors"] == ["Smith, J"]
-        assert data["zoteroLink"] == "zotero://select/items/ABC123"
+        assert data["zoteroLink"] == "zotero://select/library/items/ABC123"
+        assert data["attachments"] == []
+
+
+class TestBibtexEndpoint:
+    def test_bibtex_returns_entry(self, client):
+        with (
+            patch("riszotto.api.routes.get_client", return_value=MagicMock()),
+            patch("riszotto.api.routes.get_item_bibtex", return_value="@article{ABC123, title={Test}}"),
+        ):
+            response = client.get("/api/item/ABC123/bibtex")
+        assert response.status_code == 200
+        data = response.json()
+        assert "@article{ABC123" in data["bibtex"]
 
 
 class TestStatusEndpoint:

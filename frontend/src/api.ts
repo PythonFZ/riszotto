@@ -49,3 +49,10 @@ export async function getStatus(): Promise<IndexStatus> {
   if (!res.ok) throw new Error(`Status failed: ${res.status}`);
   return res.json();
 }
+
+export async function getBibtex(itemKey: string): Promise<string> {
+  const res = await fetch(`${BASE}/item/${itemKey}/bibtex`);
+  if (!res.ok) throw new Error(`BibTeX failed: ${res.status}`);
+  const data = await res.json();
+  return data.bibtex;
+}
