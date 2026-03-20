@@ -3,17 +3,29 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import Box from "@mui/material/Box";
+import Select from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
 import Brightness7Icon from "@mui/icons-material/Brightness7";
-import type { IndexStatus } from "../types";
+import type { IndexStatus, Library } from "../types";
 
 interface TopBarProps {
   status: IndexStatus | null;
+  libraries: Library[];
+  selectedLibrary: string;
+  onLibraryChange: (collectionName: string) => void;
   darkMode: boolean;
   onToggleDarkMode: () => void;
 }
 
-export default function TopBar({ status, darkMode, onToggleDarkMode }: TopBarProps) {
+export default function TopBar({
+  status,
+  libraries,
+  selectedLibrary,
+  onLibraryChange,
+  darkMode,
+  onToggleDarkMode,
+}: TopBarProps) {
   return (
     <AppBar
       position="static"
@@ -54,6 +66,25 @@ export default function TopBar({ status, darkMode, onToggleDarkMode }: TopBarPro
               {status.libraries.length === 1 ? "library" : "libraries"}
             </Typography>
           </Box>
+        )}
+
+        {libraries.length > 1 && (
+          <Select
+            value={selectedLibrary}
+            onChange={(e) => onLibraryChange(e.target.value)}
+            size="small"
+            sx={{
+              fontSize: 12,
+              ml: 1,
+              "& .MuiSelect-select": { py: 0.5 },
+            }}
+          >
+            {libraries.map((lib) => (
+              <MenuItem key={lib.collection_name} value={lib.collection_name} sx={{ fontSize: 12 }}>
+                {lib.name}
+              </MenuItem>
+            ))}
+          </Select>
         )}
 
         <Box sx={{ flexGrow: 1 }} />

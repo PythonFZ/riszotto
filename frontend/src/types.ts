@@ -48,3 +48,13 @@ export interface IndexStatus {
   total_papers: number;
   libraries: LibraryStatus[];
 }
+
+export type SearchMode = "semantic" | "fulltext" | "title";
+
+export interface Library {
+  name: string;
+  id: string;
+  type: "user" | "group";
+  source: "local" | "remote";
+  collection_name: string;
+}

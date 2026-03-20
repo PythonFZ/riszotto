@@ -7,14 +7,16 @@ import TopBar from "./components/TopBar";
 import SearchBar from "./components/SearchBar";
 import DetailPanel from "./components/DetailPanel";
 import GraphView from "./components/GraphView";
-import { getStatus, getNeighbors } from "./api";
-import type { Paper, GraphData, IndexStatus } from "./types";
+import { getStatus, getNeighbors, getLibraries } from "./api";
+import type { Paper, GraphData, IndexStatus, Library } from "./types";
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem("riszotto-dark-mode") === "true";
   });
   const [status, setStatus] = useState<IndexStatus | null>(null);
+  const [libraries, setLibraries] = useState<Library[]>([]);
+  const [selectedLibrary, setSelectedLibrary] = useState("user_0");
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [graphLoading, setGraphLoading] = useState(false);
@@ -31,17 +33,18 @@ export default function App() {
     });
   }, []);
 
-  // Fetch status on mount
+  // Fetch status and libraries on mount
   useEffect(() => {
     getStatus().then(setStatus).catch(() => {});
+    getLibraries().then(setLibraries).catch(() => {});
   }, []);
 
-  // Fetch graph when paper, cutoff, or depth changes
+  // Fetch graph when paper, cutoff, depth, or library changes
   const fetchGraph = useCallback(
     async (paperKey: string) => {
       setGraphLoading(true);
       try {
-        const data = await getNeighbors(paperKey, cutoff, depth);
+        const data = await getNeighbors(paperKey, cutoff, depth, selectedLibrary);
         setGraphData(data);
       } catch {
         setGraphData(null);
@@ -49,14 +52,14 @@ export default function App() {
         setGraphLoading(false);
       }
     },
-    [cutoff, depth]
+    [cutoff, depth, selectedLibrary]
   );
 
   useEffect(() => {
     if (selectedPaper) {
       fetchGraph(selectedPaper.key);
     }
-  }, [selectedPaper?.key, cutoff, depth, fetchGraph]);
+  }, [selectedPaper?.key, cutoff, depth, selectedLibrary, fetchGraph]);
 
   const handlePaperSelect = useCallback((paper: Paper) => {
     setSelectedPaper(paper);
@@ -64,7 +67,6 @@ export default function App() {
 
   const handleNodeClick = useCallback(
     (key: string) => {
-      // Re-center: find the node in current graph data to build a Paper object
       const node = graphData?.nodes.find((n) => n.key === key);
       if (node) {
         setSelectedPaper({
@@ -86,6 +88,9 @@ export default function App() {
       <Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
         <TopBar
           status={status}
+          libraries={libraries}
+          selectedLibrary={selectedLibrary}
+          onLibraryChange={setSelectedLibrary}
           darkMode={darkMode}
           onToggleDarkMode={toggleDarkMode}
         />
@@ -103,7 +108,7 @@ export default function App() {
             }}
           >
             <Box sx={{ p: 2, pb: 0 }}>
-              <SearchBar onSelect={handlePaperSelect} />
+              <SearchBar onSelect={handlePaperSelect} library={selectedLibrary} />
             </Box>
             <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
               <DetailPanel paper={selectedPaper} />

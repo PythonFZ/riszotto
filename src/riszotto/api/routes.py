@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Query
 
 from riszotto.client import (
@@ -10,22 +12,70 @@ from riszotto.client import (
     get_item,
     get_item_bibtex,
     get_pdf_attachments,
+    search_items,
 )
+from riszotto.formatting import format_creator
 from riszotto.semantic import get_index_status, get_neighbors, semantic_search
 
 router = APIRouter()
 
 
 @router.get("/search")
-def search(q: str = Query(..., min_length=1), limit: int = Query(10, ge=1, le=100)):
-    """Semantic search for papers."""
-    return semantic_search(q, limit=limit)
+def search(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=100),
+    mode: Literal["semantic", "fulltext", "title"] = Query("semantic"),
+    library: str = Query("user_0"),
+):
+    """Search for papers.
+
+    Parameters
+    ----------
+    q : str
+        Search query.
+    limit : int
+        Maximum results.
+    mode : str
+        Search mode: "semantic" (embedding similarity), "fulltext" (all fields),
+        or "title" (title/creator/year only).
+    library : str
+        ChromaDB collection name (e.g. "user_0", "group_12345").
+    """
+    if mode == "semantic":
+        return semantic_search(q, limit=limit, collection_name=library)
+
+    # For fulltext/title modes, use the Zotero search API
+    try:
+        zot = get_client()
+        results = search_items(
+            zot, q, full_text=(mode == "fulltext"), limit=limit
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Zotero unavailable: {e}")
+
+    return [
+        {
+            "key": item.get("key", ""),
+            "title": item.get("data", {}).get("title", ""),
+            "creators": "; ".join(
+                format_creator(c) for c in item.get("data", {}).get("creators", [])
+            ),
+            "date": item.get("data", {}).get("date", ""),
+            "itemType": item.get("data", {}).get("itemType", ""),
+            "score": 0,
+        }
+        for item in results
+    ]
 
 
 @router.get("/autocomplete")
-def autocomplete(q: str = Query(..., min_length=1), limit: int = Query(5, ge=1, le=20)):
+def autocomplete(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(5, ge=1, le=20),
+    library: str = Query("user_0"),
+):
     """Autocomplete suggestions from semantic search."""
-    return semantic_search(q, limit=limit)
+    return semantic_search(q, limit=limit, collection_name=library)
 
 
 @router.get("/neighbors/{item_key}")
@@ -33,9 +83,12 @@ def neighbors(
     item_key: str,
     cutoff: float = Query(0.35, ge=0.0, le=1.0),
     depth: int = Query(2, ge=1, le=4),
+    library: str = Query("user_0"),
 ):
     """Get similarity graph around a paper."""
-    result = get_neighbors(item_key, cutoff=cutoff, depth=depth)
+    result = get_neighbors(
+        item_key, cutoff=cutoff, depth=depth, collection_name=library
+    )
     if not result["nodes"]:
         raise HTTPException(status_code=404, detail="Item not found in index")
     return result
@@ -51,17 +104,7 @@ def item_detail(item_key: str):
         raise HTTPException(status_code=503, detail=f"Zotero unavailable: {e}")
 
     data = raw.get("data", raw)
-    creators = data.get("creators", [])
-    authors = []
-    for c in creators:
-        last = c.get("lastName", "")
-        first = c.get("firstName", "")
-        if last and first:
-            authors.append(f"{last}, {first}")
-        elif last:
-            authors.append(last)
-        elif c.get("name"):
-            authors.append(c["name"])
+    authors = [format_creator(c) for c in data.get("creators", [])]
 
     pdf_attachments = []
     try:
@@ -98,6 +141,12 @@ def item_bibtex(item_key: str):
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Zotero unavailable: {e}")
     return {"bibtex": bibtex}
+
+
+@router.get("/libraries")
+def libraries():
+    """List all accessible Zotero libraries."""
+    return discover_libraries()
 
 
 @router.get("/status")
