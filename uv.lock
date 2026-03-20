@@ -2329,6 +2329,10 @@ semantic = [
     { name = "sentence-transformers" },
     { name = "tqdm" },
 ]
+web = [
+    { name = "fastapi" },
+    { name = "uvicorn" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -2340,13 +2344,15 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "chromadb", marker = "extra == 'semantic'", specifier = ">=0.4.0" },
+    { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.100.0" },
     { name = "markitdown", extras = ["pdf"], specifier = ">=0.1.0" },
     { name = "pyzotero", specifier = ">=1.5.0" },
     { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=2.2.0" },
     { name = "tqdm", marker = "extra == 'semantic'", specifier = ">=4.0.0" },
     { name = "typer", specifier = ">=0.9.0" },
+    { name = "uvicorn", marker = "extra == 'web'", specifier = ">=0.20.0" },
 ]
-provides-extras = ["semantic"]
+provides-extras = ["semantic", "web"]
 
 [package.metadata.requires-dev]
 dev = [
