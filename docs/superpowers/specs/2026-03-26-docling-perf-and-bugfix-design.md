@@ -42,7 +42,7 @@ These are strictly better with no user-facing trade-offs:
 
 - **`ThreadedPdfPipelineOptions`** instead of `PdfPipelineOptions` — multi-threaded page processing pipeline
 - **`AcceleratorDevice.AUTO`** — uses MPS on Mac, CUDA on NVIDIA
-- **`num_threads=4`** — parallel processing
+- **`num_threads=os.cpu_count()`** — use all available cores (docling defaults to 4)
 
 ### New CLI flags on `show`
 
@@ -80,7 +80,7 @@ When `--equations latex` and `element.text` is `None` (VLM failed), fall back to
 | CLI state | Pipeline option | Value |
 |---|---|---|
 | always | `ThreadedPdfPipelineOptions` | (use instead of `PdfPipelineOptions`) |
-| always | `accelerator_options` | `AcceleratorDevice.AUTO`, `num_threads=4` |
+| always | `accelerator_options` | `AcceleratorDevice.AUTO`, `num_threads=os.cpu_count()` |
 | always | `generate_picture_images` | `True` |
 | `--ocr` absent | `do_ocr` | `False` |
 | `--ocr` present | `do_ocr` | `True` |
