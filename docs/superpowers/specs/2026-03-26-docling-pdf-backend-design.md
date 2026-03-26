@@ -6,7 +6,7 @@
 
 ## Problem
 
-riszotto currently uses markitdown for PDF-to-markdown conversion. markitdown produces OCR-level text only: no figures, no structured tables, no equation rendering. For scientific papers, this means losing critical information carried in figures, complex tables, and mathematical notation. markitdown remains the lightweight default; this design adds a richer alternative.
+riszotto currently uses markitdown for PDF-to-markdown conversion. markitdown extracts plain text only: no figures, no structured tables, no equation rendering. For scientific papers, this means losing critical information carried in figures, complex tables, and mathematical notation. markitdown remains the lightweight default; this design adds a richer alternative.
 
 ## Solution Overview
 
@@ -26,10 +26,26 @@ Key behaviors:
 ```
 src/riszotto/converter/
   __init__.py       # get_converter() factory + auto-detection
-  base.py           # ConversionResult dataclass + Converter Protocol
+  base.py           # ConversionResult dataclass + Converter Protocol + shared types
   markitdown.py     # wraps existing MarkItDown logic
   docling.py        # docling backend
   cache.py          # sha256-keyed file cache
+```
+
+Additionally, a new `paths.py` module at `src/riszotto/paths.py` centralizes all platform-specific directory resolution (see Platform Directories section).
+
+### Type Definitions
+
+```python
+# base.py
+from typing import Annotated, Literal
+
+StyleOption = Literal["inline", "image"]
+BackendName = Literal["markitdown", "docling"]
+
+# For CLI flags that only apply when docling is the active backend.
+# None means "not specified" (use backend default / ignore).
+BackendOption = Annotated[StyleOption | None, "Only available with docling backend"]
 ```
 
 ### Converter Protocol
@@ -51,18 +67,20 @@ class Converter(Protocol):
         self,
         pdf_path: Path,
         *,
-        table_style: str = "inline",
-        equation_style: str = "inline",
-        zotero_key: str | None = None,
+        table_style: StyleOption = "inline",
+        equation_style: StyleOption = "inline",
+        zotero_key: str,
         no_cache: bool = False,
     ) -> ConversionResult: ...
 ```
+
+Note: `zotero_key` is required (not optional) since the cache directory depends on it and `show` always has a key. Standalone PDF conversion outside Zotero is not a supported use case.
 
 ### Auto-Detection Factory
 
 ```python
 # __init__.py
-def get_converter(backend: str | None = None) -> Converter:
+def get_converter(backend: BackendName | None = None) -> Converter:
     if backend == "markitdown":
         return MarkItDownConverter()
     if backend == "docling":
@@ -76,14 +94,31 @@ def get_converter(backend: str | None = None) -> Converter:
 
 ### MarkItDownConverter
 
-Extracts the existing `MarkItDown().convert(path).markdown` logic from `cli.py`. Returns `ConversionResult(markdown=..., figures={})` -- no figures, same behavior as today. Ignores `table_style`, `equation_style`, `zotero_key`, and `no_cache` parameters.
+Extracts the existing `MarkItDown().convert(path).markdown` logic from `cli.py`. Returns `ConversionResult(markdown=..., figures={})` -- no figures, same behavior as today. Ignores `table_style`, `equation_style`, and `no_cache` parameters (cache is not used for markitdown since it's fast enough).
 
 ### DoclingConverter
+
+#### Markdown generation strategy
+
+The converter uses a **manual document tree walk** rather than `export_to_markdown()` + string replacement. This avoids fragile regex-based post-processing on markdown output.
+
+1. Run the docling pipeline to get a `ConversionResult` with `result.document`
+2. Iterate items via `result.document.iterate_items()` to walk the document tree in reading order
+3. For each element, decide rendering based on type and style flags:
+   - **`TextItem`** (paragraphs, headings, captions): render as markdown text
+   - **`PictureItem`**: always save `element.get_image(result.document)` to cache, emit `![Figure N](cache_path/figure_N.png)`
+   - **`TableItem`** with `table_style="inline"`: use `element.export_to_dataframe(doc=result.document).to_markdown()`
+   - **`TableItem`** with `table_style="image"`: save `element.get_image(result.document)` to cache, emit `![Table N](cache_path/table_N.png)`
+   - **`FormulaItem`** with `equation_style="inline"` and non-empty `.text`: emit as `$$...$$` LaTeX block
+   - **`FormulaItem`** with `equation_style="image"` or empty `.text` (failed enrichment): save equation region image to cache, emit `![Equation N](cache_path/equation_N.png)`
+4. Assemble the final markdown string from the rendered elements
+
+This approach gives full control over how each element is rendered and avoids the fragility of string replacement.
 
 #### Conversion flow
 
 1. **Check cache** -- hash PDF contents with sha256, look for cached result
-2. **Cache hit** -- validate style flags match `meta.json`, read `content.md`, glob figures, return `ConversionResult`
+2. **Cache hit** -- validate style flags match `meta.json`, read `content.md`, glob images, return `ConversionResult`
 3. **Cache miss** (or style mismatch, or `no_cache`) -- run docling pipeline:
 
 ```python
@@ -91,7 +126,7 @@ pipeline_options = PdfPipelineOptions()
 pipeline_options.generate_picture_images = True
 pipeline_options.images_scale = 2.0
 pipeline_options.do_table_structure = True
-pipeline_options.do_formula_enrichment = True
+pipeline_options.do_formula_enrichment = True  # off by default in docling, enabled explicitly
 
 converter = DocumentConverter(
     format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
@@ -99,14 +134,7 @@ converter = DocumentConverter(
 result = converter.convert(pdf_path)
 ```
 
-4. **Post-process based on style flags**:
-   - `table_style="inline"` -- tables stay as markdown pipe tables
-   - `table_style="image"` -- iterate `TableItem`s, save via `element.get_image(doc)`, replace in markdown with `![Table N](cache_path/table_N.png)`
-   - `equation_style="inline"` -- LaTeX stays as `$$...$$`
-   - `equation_style="image"` -- save equation region images, replace with `![Equation N](cache_path/equation_N.png)`
-   - **Figures always become images** -- `PictureItem`s saved to cache, referenced as `![Figure N](cache_path/figure_N.png)`
-   - **Failed equation enrichment** -- if docling returns empty text for an equation, fall back to image regardless of `equation_style`
-
+4. **Build markdown** via document tree walk (see strategy above)
 5. **Write cache** -- save `content.md` + all image files + `meta.json`
 6. **Return** `ConversionResult`
 
@@ -117,8 +145,7 @@ try:
     from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.datamodel.pipeline_options import PdfPipelineOptions
     from docling.datamodel.base_models import InputFormat
-    from docling_core.types.doc import PictureItem, TableItem
-    from docling.datamodel.image_ref_mode import ImageRefMode
+    from docling_core.types.doc import PictureItem, TableItem, FormulaItem
     DOCLING_AVAILABLE = True
 except ImportError:
     DOCLING_AVAILABLE = False
@@ -126,19 +153,87 @@ except ImportError:
 
 `DoclingConverter.__init__()` raises `ImportError("Install riszotto[full] for docling support")` if `DOCLING_AVAILABLE` is False.
 
+## Platform Directories
+
+### Migration from `~/.riszotto/`
+
+All riszotto paths move to platform-appropriate locations via `platformdirs`:
+
+| Purpose | Old path | New path (macOS) | New path (Linux) |
+|---------|----------|-------------------|-------------------|
+| Config | `~/.riszotto/config.toml` | `~/Library/Application Support/riszotto/config.toml` | `~/.config/riszotto/config.toml` |
+| ChromaDB | `~/.riszotto/chroma_db/` | `~/Library/Application Support/riszotto/chroma_db/` | `~/.local/share/riszotto/chroma_db/` |
+| Cache | _(new)_ | `~/Library/Caches/riszotto/` | `~/.cache/riszotto/` |
+
+### Centralized path module
+
+```python
+# src/riszotto/paths.py
+from pathlib import Path
+from platformdirs import user_config_dir, user_data_dir, user_cache_dir
+
+def config_dir() -> Path:
+    return Path(user_config_dir("riszotto"))
+
+def data_dir() -> Path:
+    return Path(user_data_dir("riszotto"))
+
+def cache_dir() -> Path:
+    return Path(user_cache_dir("riszotto"))
+
+CONFIG_PATH = config_dir() / "config.toml"
+CHROMA_DIR = data_dir() / "chroma_db"
+CONVERSION_CACHE_DIR = cache_dir() / "conversions"
+```
+
+### Legacy path migration
+
+On startup (in `paths.py`), check if `~/.riszotto/` exists and differs from the new platformdirs paths. If so:
+
+```python
+LEGACY_DIR = Path.home() / ".riszotto"
+
+def check_legacy_migration() -> None:
+    """Warn if legacy ~/.riszotto/ exists and differs from platformdirs paths."""
+    if not LEGACY_DIR.exists():
+        return
+    if LEGACY_DIR.resolve() == config_dir().resolve():
+        return  # same path (e.g., XDG_CONFIG_HOME set to ~/.riszotto)
+    # Check for config.toml
+    legacy_config = LEGACY_DIR / "config.toml"
+    if legacy_config.exists() and not CONFIG_PATH.exists():
+        typer.echo(
+            f"Found legacy config at {legacy_config}. "
+            f"Please move it to {CONFIG_PATH}",
+            err=True,
+        )
+    # Check for chroma_db
+    legacy_chroma = LEGACY_DIR / "chroma_db"
+    if legacy_chroma.exists() and not CHROMA_DIR.exists():
+        typer.echo(
+            f"Found legacy index at {legacy_chroma}. "
+            f"Please move it to {CHROMA_DIR}",
+            err=True,
+        )
+```
+
+This is a warning-only migration -- no automatic file moves. The user moves files at their convenience. After migration, they can delete `~/.riszotto/`.
+
+### Updates to existing modules
+
+- `config.py`: replace `CONFIG_PATH = Path.home() / ".riszotto" / "config.toml"` with import from `paths.py`
+- `semantic.py`: replace `INDEX_DIR = Path.home() / ".riszotto" / "chroma_db"` with import from `paths.py`
+
 ## Cache System
 
 ### Location
 
-Uses `platformdirs.user_cache_dir("riszotto")` for platform-appropriate paths:
-- macOS: `~/Library/Caches/riszotto`
-- Linux: `~/.cache/riszotto`
-- Windows: `C:\Users\<user>\AppData\Local\riszotto\Cache`
+Uses `CONVERSION_CACHE_DIR` from `paths.py` (i.e., `platformdirs.user_cache_dir("riszotto") / "conversions"`).
 
 ### Directory structure
 
 ```
-<cache_dir>/
+<cache_dir>/conversions/
   <zotero_key>/
     <sha256[:12]>/
       content.md
@@ -163,11 +258,13 @@ from datetime import datetime
 
 class CacheMeta(BaseModel):
     created: datetime
-    backend: str
-    table_style: str
-    equation_style: str
+    backend: BackendName
+    table_style: StyleOption
+    equation_style: StyleOption
     pdf_hash: str
 ```
+
+Serialized via `meta.model_dump_json()`, deserialized via `CacheMeta.model_validate_json(path.read_text())`.
 
 ### Cache invalidation
 
@@ -175,6 +272,8 @@ Cache is invalidated when:
 - PDF content changes (different sha256 hash)
 - Style flags differ from cached `meta.json` (e.g., request `--table-style image` but cache has `inline`)
 - User passes `--no-cache`
+
+**Known limitation**: style-only changes re-run the full docling pipeline. A future optimization could cache the raw docling document object separately and only re-run the lightweight post-processing step. Not in scope for v1.
 
 ### `--no-cache` behavior
 
@@ -193,9 +292,10 @@ riszotto show KEY [existing flags...]
     --figure N                      # display path to cached figure N
 ```
 
-- `--backend docling` when docling not installed: error with install instructions
-- `--table-style` / `--equation-style` when backend is markitdown: error explaining these require docling
-- `--figure N` reads from cache; errors if paper hasn't been processed with docling yet
+- `--backend docling` when docling not installed: error with `"docling not installed. Install with: uv add riszotto[full]"`
+- `--table-style` / `--equation-style` when backend is markitdown: error with `"--table-style requires docling backend. Install with: uv add riszotto[full]"`
+- `--figure N`: outputs only the file path to figure N (no markdown output). 1-indexed. Mutually exclusive with `--search` and `--page`. Out-of-range N produces an error listing available figures with `"Paper has N figures (1-N). Use --figure 1 through --figure N."`
+- `--figure N` when paper has no cache: error with `"No cached conversion for KEY. Run 'riszotto show KEY' with docling first."`
 
 ### New `cache` command group
 
@@ -204,8 +304,13 @@ riszotto cache show                     # total size, paper count, cache path
 riszotto cache show --key KEY           # size + file listing for one paper
 riszotto cache clear                    # clear entire cache
 riszotto cache clear --key KEY          # clear one paper
-riszotto cache clear --older-than 30d   # age-based cleanup
+riszotto cache clear --older-than 30d   # age-based cleanup (accepts <N>d for days)
 ```
+
+Error handling:
+- No cache directory yet (first run): `"Cache is empty (0 papers, 0 B). Path: <cache_dir>"`
+- `--key KEY` with no cache entry: `"No cached data for KEY."`
+- Invalid `--older-than` format: `"Invalid duration format. Use <N>d, e.g., --older-than 30d"`
 
 ### Integration in `show`
 
@@ -222,6 +327,10 @@ result = converter.convert(
 ```
 
 Existing pagination (`--page`, `--page-size`) and search (`--search`, `--context`) operate on `result.markdown` regardless of backend.
+
+### Performance expectations
+
+First `riszotto show` with docling takes ~30-120 seconds depending on paper length (model loading + inference). Subsequent views of the same paper are near-instant from cache. A progress message is shown to stderr during conversion: `"Converting PDF with docling..."`.
 
 ## Packaging
 
@@ -244,10 +353,12 @@ semantic = [
     "tqdm>=4.0.0",
 ]
 full = [
-    "docling>=2.70.0",
+    "docling>=2.80.0",
     "riszotto[semantic]",
 ]
 ```
+
+Note: `docling>=2.80.0` floor chosen to ensure all referenced API features (`do_formula_enrichment`, `generate_picture_images`, `FormulaItem`, etc.) are available. The `[full]` extra includes `[semantic]` -- this is intentional so that `uv add riszotto[full]` gets everything. Users wanting only docling without semantic search should install docling separately.
 
 Install paths:
 - `uv add riszotto` -- lightweight, markitdown only
@@ -267,5 +378,10 @@ Install paths:
 - Export (`export` command)
 - Collections, recent, libraries, index commands
 - All existing flags on all commands
-- Config file location and format (`~/.riszotto/config.toml`)
-- ChromaDB location (`~/.riszotto/chroma_db/`)
+
+## What Changes Beyond the Docling Feature
+
+- Config path moves from `~/.riszotto/config.toml` to `platformdirs.user_config_dir("riszotto")/config.toml`
+- ChromaDB path moves from `~/.riszotto/chroma_db/` to `platformdirs.user_data_dir("riszotto")/chroma_db/`
+- Legacy `~/.riszotto/` detected on startup with migration guidance
+- `pydantic` and `platformdirs` added as core dependencies
