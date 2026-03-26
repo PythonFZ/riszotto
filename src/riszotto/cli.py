@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
-from markitdown import MarkItDown
 from pyzotero import zotero
 from pyzotero.zotero_errors import PyZoteroError
 
@@ -25,6 +25,8 @@ from riszotto.client import (
     search_items,
 )
 from riszotto.config import load_config
+from riszotto.converter import get_converter
+from riszotto.converter.base import BackendName, StyleOption
 from riszotto.formatting import (
     format_creator,
     format_items_table,
@@ -522,6 +524,24 @@ def search(
             )
 
 
+def _get_cached_figures(zotero_key: str) -> dict[str, Path] | None:
+    """Look up cached figures for a paper. Returns None if no cache exists."""
+    from riszotto.converter.cache import CONVERSION_CACHE_DIR
+
+    key_dir = CONVERSION_CACHE_DIR / zotero_key
+    if not key_dir.exists():
+        return None
+    for hash_dir in key_dir.iterdir():
+        if hash_dir.is_dir():
+            figs = {
+                f.name: f
+                for f in hash_dir.iterdir()
+                if f.suffix in (".png", ".jpg", ".jpeg")
+            }
+            return figs if figs else None
+    return None
+
+
 @app.command()
 def show(
     key: Annotated[str, typer.Argument(help="Zotero item key")],
@@ -541,9 +561,59 @@ def show(
         typer.Option("--context", "-C", help="Context lines around each search match"),
     ] = 3,
     library: LibraryOption = None,
+    backend: Annotated[
+        Optional[str],
+        typer.Option("--backend", help="Converter backend (markitdown or docling)"),
+    ] = None,
+    table_style: Annotated[
+        str,
+        typer.Option("--table-style", help="Table rendering: inline or image (docling only)"),
+    ] = "inline",
+    equation_style: Annotated[
+        str,
+        typer.Option("--equation-style", help="Equation rendering: inline or image (docling only)"),
+    ] = "inline",
+    no_cache: Annotated[
+        bool,
+        typer.Option("--no-cache", help="Force re-processing (skip cache)"),
+    ] = False,
+    figure: Annotated[
+        Optional[int],
+        typer.Option("--figure", help="Display path to cached figure N (1-indexed)"),
+    ] = None,
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
+    if table_style not in ("inline", "image"):
+        typer.echo(f"Invalid --table-style: {table_style}. Use 'inline' or 'image'.", err=True)
+        raise typer.Exit(1)
+    if equation_style not in ("inline", "image"):
+        typer.echo(f"Invalid --equation-style: {equation_style}. Use 'inline' or 'image'.", err=True)
+        raise typer.Exit(1)
+
     zot = _get_zot(library=library)
+
+    # Handle --figure flag (reads from cache, no conversion)
+    if figure is not None:
+        figures = _get_cached_figures(key)
+        if figures is None:
+            typer.echo(
+                f"No cached conversion for {key}. Run 'riszotto show {key}' with docling first.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        sorted_figs = sorted(
+            [(n, p) for n, p in figures.items() if n.startswith("figure_")],
+            key=lambda x: x[0],
+        )
+        if figure < 1 or figure > len(sorted_figs):
+            typer.echo(
+                f"Paper has {len(sorted_figs)} figure(s) (1-{len(sorted_figs)}). "
+                f"Use --figure 1 through --figure {len(sorted_figs)}.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        typer.echo(str(sorted_figs[figure - 1][1]))
+        return
 
     pdfs = get_pdf_attachments(zot, key)
     if not pdfs:
@@ -572,17 +642,20 @@ def show(
         raise typer.Exit(1)
 
     try:
-        import logging
-
-        logging.disable(logging.CRITICAL)
-        try:
-            md = MarkItDown()
-            result = md.convert(file_path)
-            markdown = result.markdown
-        finally:
-            logging.disable(logging.NOTSET)
+        converter = get_converter(backend)
+        result = converter.convert(
+            Path(file_path),
+            table_style=table_style,
+            equation_style=equation_style,
+            zotero_key=key,
+            no_cache=no_cache,
+        )
+        markdown = result.markdown
+    except ImportError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
     except Exception as e:
-        typer.echo(f"Failed to convert PDF to markdown: {e}", err=True)
+        typer.echo(f"Failed to convert PDF: {e}", err=True)
         raise typer.Exit(1)
 
     if search is not None:

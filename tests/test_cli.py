@@ -493,9 +493,11 @@ class TestConnectionError:
 
 
 class TestShow:
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_converts_pdf(self, mock_get_client, mock_markitdown_cls):
+    def test_show_converts_pdf(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -513,18 +515,16 @@ class TestShow:
                 },
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
-        mock_result.markdown = "# Paper Title\n\nSome content here."
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="# Paper Title\n\nSome content here."
+        )
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(app, ["show", "PARENT1"])
         assert result.exit_code == 0
         assert "# Paper Title" in result.output
-        mock_md.convert.assert_called_once_with(
-            "/Users/me/Zotero/storage/ATT1/paper.pdf"
-        )
+        mock_converter.convert.assert_called_once()
 
     @patch("riszotto.cli.get_client")
     def test_show_no_pdf_attachment(self, mock_get_client):
@@ -537,9 +537,11 @@ class TestShow:
         assert result.exit_code == 1
         assert "No PDF attachment" in result.output
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_attachment_flag(self, mock_get_client, mock_markitdown_cls):
+    def test_show_attachment_flag(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -562,19 +564,19 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper2.pdf"}},
             },
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
-        mock_result.markdown = "Second PDF content"
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="Second PDF content")
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(app, ["show", "--attachment", "2", "PARENT1"])
         assert result.exit_code == 0
-        mock_md.convert.assert_called_once_with("/path/to/paper2.pdf")
+        mock_converter.convert.assert_called_once()
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_page_default_paginates(self, mock_get_client, mock_markitdown_cls):
+    def test_show_page_default_paginates(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -588,12 +590,12 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
         # 10 lines of content, page_size=5
-        mock_result.markdown = "\n".join(f"Line {i}" for i in range(1, 11))
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="\n".join(f"Line {i}" for i in range(1, 11))
+        )
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(app, ["show", "--page-size", "5", "PARENT1"])
         assert result.exit_code == 0
@@ -602,9 +604,11 @@ class TestShow:
         assert "Line 6" not in result.output
         assert "Page 1/2" in result.output
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_page_2(self, mock_get_client, mock_markitdown_cls):
+    def test_show_page_2(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -618,11 +622,11 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
-        mock_result.markdown = "\n".join(f"Line {i}" for i in range(1, 11))
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="\n".join(f"Line {i}" for i in range(1, 11))
+        )
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(
             app, ["show", "--page", "2", "--page-size", "5", "PARENT1"]
@@ -632,9 +636,11 @@ class TestShow:
         assert "Line 10" in result.output
         assert "Line 5" not in result.output
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_page_zero_dumps_all(self, mock_get_client, mock_markitdown_cls):
+    def test_show_page_zero_dumps_all(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -648,11 +654,11 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
-        mock_result.markdown = "\n".join(f"Line {i}" for i in range(1, 11))
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="\n".join(f"Line {i}" for i in range(1, 11))
+        )
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(
             app, ["show", "--page", "0", "--page-size", "5", "PARENT1"]
@@ -661,9 +667,11 @@ class TestShow:
         assert "Line 1" in result.output
         assert "Line 10" in result.output
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_page_out_of_range(self, mock_get_client, mock_markitdown_cls):
+    def test_show_page_out_of_range(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -677,11 +685,9 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
-        mock_result.markdown = "Short doc"
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="Short doc")
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(
             app, ["show", "--page", "99", "--page-size", "5", "PARENT1"]
@@ -689,9 +695,11 @@ class TestShow:
         assert result.exit_code == 1
         assert "out of range" in result.output.lower()
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_search_finds_lines(self, mock_get_client, mock_markitdown_cls):
+    def test_show_search_finds_lines(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -705,15 +713,15 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
         # 20 filler lines, then a match, then 20 more filler lines
         lines = [f"filler line {i}" for i in range(20)]
         lines.append("This paper studies regression.")
         lines.extend(f"filler line {i}" for i in range(20, 40))
-        mock_result.markdown = "\n".join(lines)
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="\n".join(lines)
+        )
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(
             app, ["show", "--search", "regression", "-C", "1", "PARENT1"]
@@ -724,9 +732,11 @@ class TestShow:
         assert "filler line 20" in result.output  # 1 line after
         assert "filler line 0" not in result.output  # far away
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_search_no_match(self, mock_get_client, mock_markitdown_cls):
+    def test_show_search_no_match(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -740,21 +750,21 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
-        mock_result.markdown = (
-            "# Introduction\n\nSome content.\n\n## Methods\n\nMore content."
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="# Introduction\n\nSome content.\n\n## Methods\n\nMore content."
         )
-        mock_md.convert.return_value = mock_result
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(app, ["show", "--search", "nonexistent", "PARENT1"])
         assert result.exit_code == 0
         assert "No lines matching" in result.output
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_search_multiple_terms(self, mock_get_client, mock_markitdown_cls):
+    def test_show_search_multiple_terms(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -768,18 +778,18 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
         # 20 filler lines between each content line to avoid context overlap
         filler_a = "\n".join(f"padding {i}" for i in range(20))
-        mock_result.markdown = (
-            f"DFT and BMIM were studied.\n{filler_a}\n"
-            f"We used DFT calculations.\n{filler_a}\n"
-            f"BMIM showed interesting properties.\n{filler_a}\n"
-            f"DFT confirms BMIM stability."
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown=(
+                f"DFT and BMIM were studied.\n{filler_a}\n"
+                f"We used DFT calculations.\n{filler_a}\n"
+                f"BMIM showed interesting properties.\n{filler_a}\n"
+                f"DFT confirms BMIM stability."
+            )
         )
-        mock_md.convert.return_value = mock_result
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(
             app, ["show", "--search", "DFT BMIM", "-C", "0", "PARENT1"]
@@ -792,9 +802,11 @@ class TestShow:
         assert "We used DFT calculations." not in result.output
         assert "BMIM showed interesting properties." not in result.output
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_search_case_insensitive(self, mock_get_client, mock_markitdown_cls):
+    def test_show_search_case_insensitive(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -808,21 +820,23 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
-        mock_result.markdown = "Machine Learning is great."
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="Machine Learning is great."
+        )
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(app, ["show", "--search", "MACHINE LEARNING", "PARENT1"])
         assert result.exit_code == 0
         assert "Machine Learning is great." in result.output
 
-    @patch("riszotto.cli.MarkItDown")
+    @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
     def test_show_search_separator_between_blocks(
-        self, mock_get_client, mock_markitdown_cls
+        self, mock_get_client, mock_get_converter
     ):
+        from riszotto.converter.base import ConversionResult
+
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.children.return_value = [
@@ -836,18 +850,136 @@ class TestShow:
                 "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
-        mock_md = MagicMock()
-        mock_markitdown_cls.return_value = mock_md
-        mock_result = MagicMock()
         lines = [f"filler {i}" for i in range(20)]
         lines[3] = "match alpha here"
         lines[15] = "match alpha there"
-        mock_result.markdown = "\n".join(lines)
-        mock_md.convert.return_value = mock_result
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="\n".join(lines)
+        )
+        mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(app, ["show", "--search", "alpha", "-C", "1", "PARENT1"])
         assert result.exit_code == 0
         assert "\n--\n" in result.output
+
+
+class TestShowConverterIntegration:
+    """Tests for the converter-backed show command."""
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_uses_converter(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {
+                    "enclosure": {"href": "file:///path/to/paper.pdf"}
+                },
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="# Converted\n\nContent"
+        )
+        mock_get_converter.return_value = mock_converter
+
+        result = runner.invoke(app, ["show", "PARENT1"])
+        assert result.exit_code == 0
+        assert "# Converted" in result.output
+        mock_converter.convert.assert_called_once()
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_backend_flag(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="text")
+        mock_get_converter.return_value = mock_converter
+
+        runner.invoke(app, ["show", "--backend", "markitdown", "PARENT1"])
+        mock_get_converter.assert_called_with("markitdown")
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_style_flags_passed_to_converter(
+        self, mock_get_client, mock_get_converter
+    ):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="text")
+        mock_get_converter.return_value = mock_converter
+
+        runner.invoke(
+            app,
+            ["show", "--table-style", "image", "--equation-style", "image", "P1"],
+        )
+        call_kwargs = mock_converter.convert.call_args[1]
+        assert call_kwargs["table_style"] == "image"
+        assert call_kwargs["equation_style"] == "image"
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_no_cache_flag(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="text")
+        mock_get_converter.return_value = mock_converter
+
+        runner.invoke(app, ["show", "--no-cache", "P1"])
+        call_kwargs = mock_converter.convert.call_args[1]
+        assert call_kwargs["no_cache"] is True
 
 
 class TestExport:
