@@ -27,13 +27,21 @@ from riszotto.client import (
 from riszotto.config import load_config
 from riszotto.converter import get_converter
 from riszotto.converter.base import BackendName, StyleOption
+from riszotto.converter.cache import clear_cache, get_cache_stats
 from riszotto.formatting import (
     format_creator,
     format_items_table,
     format_collections_table,
 )
 
-app = typer.Typer(add_completion=False)
+def _app_callback() -> None:
+    """Run startup checks."""
+    from riszotto.paths import check_legacy_migration
+
+    check_legacy_migration()
+
+
+app = typer.Typer(add_completion=False, callback=_app_callback)
 
 LibraryOption = Annotated[
     Optional[str],
@@ -970,3 +978,73 @@ def libraries() -> None:
             f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {str(lib['items']):<8} {str(lib['indexed']):<8} {lib['source']}"
         )
     typer.echo("\n".join(lines))
+
+
+# ── Cache command group ──────────────────────────────────────────────
+
+cache_app = typer.Typer(add_completion=False, help="Manage the conversion cache.")
+app.add_typer(cache_app, name="cache")
+
+
+def _format_bytes(n: int) -> str:
+    """Format byte count as human-readable string."""
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024:
+            return f"{n:.1f} {unit}" if unit != "B" else f"{n} {unit}"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+@cache_app.command("show")
+def cache_show(
+    key: Annotated[
+        Optional[str],
+        typer.Option("--key", "-k", help="Show cache for a specific paper"),
+    ] = None,
+) -> None:
+    """Show cache statistics."""
+    stats = get_cache_stats(key=key)
+    if key and stats["paper_count"] == 0:
+        typer.echo(f"No cached data for {key}.")
+        return
+    typer.echo(
+        f"Cache: {stats['paper_count']} paper(s), "
+        f"{_format_bytes(stats['total_bytes'])}. "
+        f"Path: {stats['path']}"
+    )
+    if stats.get("papers"):
+        for p in stats["papers"]:
+            typer.echo(f"  {p['key']}: {_format_bytes(p['bytes'])}")
+
+
+def _parse_duration(s: str) -> int | None:
+    """Parse a duration string like '30d' into days. Returns None on failure."""
+    if s.endswith("d") and s[:-1].isdigit():
+        return int(s[:-1])
+    return None
+
+
+@cache_app.command("clear")
+def cache_clear(
+    key: Annotated[
+        Optional[str],
+        typer.Option("--key", "-k", help="Clear cache for a specific paper"),
+    ] = None,
+    older_than: Annotated[
+        Optional[str],
+        typer.Option("--older-than", help="Clear entries older than duration (e.g., 30d)"),
+    ] = None,
+) -> None:
+    """Clear cached conversions."""
+    older_than_days = None
+    if older_than is not None:
+        older_than_days = _parse_duration(older_than)
+        if older_than_days is None:
+            typer.echo(
+                "Invalid duration format. Use <N>d, e.g., --older-than 30d",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+    cleared = clear_cache(key=key, older_than_days=older_than_days)
+    typer.echo(f"Cleared {cleared} paper(s) from cache.")

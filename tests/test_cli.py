@@ -1895,3 +1895,59 @@ class TestLibrariesIndexStatus:
         assert result.exit_code == 0
         assert "Warning: index check failed" in result.output
         assert "db corrupt" in result.output
+
+
+class TestCacheCommands:
+    @patch("riszotto.cli.get_cache_stats")
+    def test_cache_show_empty(self, mock_stats):
+        mock_stats.return_value = {
+            "paper_count": 0,
+            "total_bytes": 0,
+            "path": "/tmp/cache",
+            "papers": [],
+        }
+        result = runner.invoke(app, ["cache", "show"])
+        assert result.exit_code == 0
+        assert "0 paper(s)" in result.output
+        assert "0 B" in result.output
+
+    @patch("riszotto.cli.get_cache_stats")
+    def test_cache_show_with_data(self, mock_stats):
+        mock_stats.return_value = {
+            "paper_count": 2,
+            "total_bytes": 1048576,
+            "path": "/tmp/cache",
+            "papers": [
+                {"key": "K1", "bytes": 524288},
+                {"key": "K2", "bytes": 524288},
+            ],
+        }
+        result = runner.invoke(app, ["cache", "show"])
+        assert result.exit_code == 0
+        assert "2 paper(s)" in result.output
+
+    @patch("riszotto.cli.clear_cache")
+    def test_cache_clear_all(self, mock_clear):
+        mock_clear.return_value = 3
+        result = runner.invoke(app, ["cache", "clear"])
+        assert result.exit_code == 0
+        assert "3" in result.output
+
+    @patch("riszotto.cli.clear_cache")
+    def test_cache_clear_by_key(self, mock_clear):
+        mock_clear.return_value = 1
+        result = runner.invoke(app, ["cache", "clear", "--key", "K1"])
+        assert result.exit_code == 0
+        mock_clear.assert_called_once_with(key="K1", older_than_days=None)
+
+    @patch("riszotto.cli.clear_cache")
+    def test_cache_clear_older_than(self, mock_clear):
+        mock_clear.return_value = 5
+        result = runner.invoke(app, ["cache", "clear", "--older-than", "30d"])
+        assert result.exit_code == 0
+        mock_clear.assert_called_once_with(key=None, older_than_days=30)
+
+    def test_cache_clear_invalid_older_than(self):
+        result = runner.invoke(app, ["cache", "clear", "--older-than", "invalid"])
+        assert result.exit_code == 1
+        assert "Invalid duration" in result.output
