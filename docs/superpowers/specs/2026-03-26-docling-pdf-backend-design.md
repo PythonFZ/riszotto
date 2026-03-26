@@ -2,11 +2,11 @@
 
 **Date**: 2026-03-26
 **Status**: Approved
-**Goal**: Replace markitdown with docling for better PDF extraction of scientific papers -- figures as image references, tables as markdown, equations as LaTeX -- while keeping the base install lightweight.
+**Goal**: Add docling as a richer backend alongside markitdown for better PDF extraction of scientific papers -- figures as image references, tables as markdown, equations as LaTeX -- while keeping the base install lightweight.
 
 ## Problem
 
-riszotto currently uses markitdown for PDF-to-markdown conversion. markitdown produces OCR-level text only: no figures, no structured tables, no equation rendering. For scientific papers, this means losing critical information carried in figures, complex tables, and mathematical notation.
+riszotto currently uses markitdown for PDF-to-markdown conversion. markitdown produces OCR-level text only: no figures, no structured tables, no equation rendering. For scientific papers, this means losing critical information carried in figures, complex tables, and mathematical notation. markitdown remains the lightweight default; this design adds a richer alternative.
 
 ## Solution Overview
 
