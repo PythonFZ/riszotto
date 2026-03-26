@@ -594,6 +594,18 @@ def show(
         Optional[int],
         typer.Option("--figure", help="Display path to cached figure N (1-indexed)"),
     ] = None,
+    ocr: Annotated[
+        bool,
+        typer.Option("--ocr", help="Enable OCR for scanned PDFs (off by default)"),
+    ] = False,
+    table_mode: Annotated[
+        str,
+        typer.Option("--table-mode", help="Table extraction: fast or accurate (docling only)"),
+    ] = "fast",
+    equations: Annotated[
+        str,
+        typer.Option("--equations", help="Equation rendering: image or latex (docling only)"),
+    ] = "image",
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
     if table_style not in ("inline", "image"):
@@ -604,6 +616,18 @@ def show(
     if equation_style not in ("inline", "image"):
         typer.echo(
             f"Invalid --equation-style: {equation_style}. Use 'inline' or 'image'.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    if table_mode not in ("fast", "accurate"):
+        typer.echo(
+            f"Invalid --table-mode: {table_mode}. Use 'fast' or 'accurate'.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    if equations not in ("image", "latex"):
+        typer.echo(
+            f"Invalid --equations: {equations}. Use 'image' or 'latex'.",
             err=True,
         )
         raise typer.Exit(1)
@@ -667,8 +691,18 @@ def show(
             equation_style=equation_style,
             zotero_key=key,
             no_cache=no_cache,
+            ocr=ocr,
+            table_mode=table_mode,
+            equation_mode=equations,
         )
         markdown = result.markdown
+
+        if len(markdown) < 100 and not ocr:
+            typer.echo(
+                "Very little text extracted. If this is a scanned PDF, "
+                f"try: riszotto show --ocr {key}",
+                err=True,
+            )
     except ImportError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1)

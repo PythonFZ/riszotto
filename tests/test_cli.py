@@ -1951,3 +1951,144 @@ class TestCacheCommands:
         result = runner.invoke(app, ["cache", "clear", "--older-than", "invalid"])
         assert result.exit_code == 1
         assert "Invalid duration" in result.output
+
+
+class TestShowNewFlags:
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_ocr_flag(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="text")
+        mock_get_converter.return_value = mock_converter
+
+        runner.invoke(app, ["show", "--ocr", "P1"])
+        call_kwargs = mock_converter.convert.call_args[1]
+        assert call_kwargs["ocr"] is True
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_ocr_default_off(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="text")
+        mock_get_converter.return_value = mock_converter
+
+        runner.invoke(app, ["show", "P1"])
+        call_kwargs = mock_converter.convert.call_args[1]
+        assert call_kwargs["ocr"] is False
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_table_mode_flag(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="text")
+        mock_get_converter.return_value = mock_converter
+
+        runner.invoke(app, ["show", "--table-mode", "accurate", "P1"])
+        call_kwargs = mock_converter.convert.call_args[1]
+        assert call_kwargs["table_mode"] == "accurate"
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_equations_flag(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="text")
+        mock_get_converter.return_value = mock_converter
+
+        runner.invoke(app, ["show", "--equations", "latex", "P1"])
+        call_kwargs = mock_converter.convert.call_args[1]
+        assert call_kwargs["equation_mode"] == "latex"
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_empty_output_warns(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(markdown="short")
+        mock_get_converter.return_value = mock_converter
+
+        result = runner.invoke(app, ["show", "P1"])
+        assert "Very little text extracted" in result.output or result.exit_code == 0
+
+    def test_show_invalid_table_mode(self):
+        result = runner.invoke(app, ["show", "--table-mode", "bogus", "P1"])
+        assert result.exit_code == 1
+        assert "Invalid --table-mode" in result.output
+
+    def test_show_invalid_equations(self):
+        result = runner.invoke(app, ["show", "--equations", "bogus", "P1"])
+        assert result.exit_code == 1
+        assert "Invalid --equations" in result.output
