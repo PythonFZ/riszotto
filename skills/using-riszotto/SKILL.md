@@ -9,6 +9,23 @@ CLI for searching, reading, and exporting papers from Zotero. Run via `uvx riszo
 
 Default: personal library. Use `-L "Name"` for groups, `-A` for all libraries. Discover with `uvx riszotto libraries`.
 
+## Dos and Don'ts
+
+**Do:**
+- Run `uvx riszotto search "query"` directly — output is a readable table
+- Read the table output as-is — keys, dates, authors, and titles are all there
+- Use `-l` / `--limit` to control result count
+- Combine filters: `--author`, `--tag`, `--full-text` to narrow results
+- Run multiple searches as separate commands
+
+**Don't:**
+- Pipe riszotto output through `python3 -c "import sys,json; ..."` — the table is already human-readable
+- Use `--format json` unless you have a specific programmatic need (you almost never do)
+- Use `2>/dev/null` to suppress stderr — let errors surface so you can act on them
+- Truncate titles manually with `[:80]` — the table already truncates
+- Parse table output with scripts — if you truly need structured data, use `--format json`, but question why first
+- Chain multiple searches in a single shell command with `echo "---"` separators
+
 ## Quick Reference
 
 | Task | Command |
@@ -28,6 +45,7 @@ Default: personal library. Use `-L "Name"` for groups, `-A` for all libraries. D
 | Collections | `uvx riszotto collections` |
 | Recent papers | `uvx riszotto recent` |
 | Build semantic index | `uvx riszotto index` |
+| JSON output | `uvx riszotto search "query" --format json` |
 
 ## Search Strategy
 
@@ -42,7 +60,6 @@ Tips:
 - Fewer terms = more hits (keyword mode uses AND logic)
 - `--author "name"` handles diacritics automatically ("schafer" matches "Schäfer")
 - `--fuzzy` with `--author` for uncertain spelling (Levenshtein distance <= 2)
-- `--max-value-size 0` to see full abstracts
 - Check `libraries` output for `Indexed` column before using `--semantic`
 
 ## Common Mistakes
@@ -50,6 +67,6 @@ Tips:
 - **Zotero not running:** Start Zotero desktop with local API enabled
 - **Semantic without index:** Run `uvx riszotto index` first (per library)
 - **`show` needs parent key**, not attachment key; requires locally synced PDFs for group libraries
-- **Flag conflict:** `-L` = `--library`, `-l` = `--limit`
+- **Flag conflict:** `-L` = `--library`, `-l` = `--limit`, `-f` = `--format`
 
 Run `uvx riszotto <command> --help` for full options.
