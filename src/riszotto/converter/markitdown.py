@@ -7,7 +7,7 @@ from pathlib import Path
 
 from markitdown import MarkItDown
 
-from riszotto.converter.base import ConversionResult, StyleOption
+from riszotto.converter.base import ConversionResult, EquationMode, StyleOption
 
 
 class MarkItDownConverter:
@@ -15,7 +15,7 @@ class MarkItDownConverter:
 
     This is the lightweight default backend. It extracts plain text
     only -- no figures, structured tables, or equation rendering.
-    Style flags and caching are ignored.
+    Style flags, caching, and docling-specific options are ignored.
     """
 
     def convert(
@@ -26,6 +26,9 @@ class MarkItDownConverter:
         equation_style: StyleOption = "inline",
         zotero_key: str,
         no_cache: bool = False,
+        ocr: bool = False,
+        table_mode: str = "fast",
+        equation_mode: EquationMode = "image",
     ) -> ConversionResult:
         """Convert a PDF to markdown using MarkItDown."""
         logging.disable(logging.CRITICAL)

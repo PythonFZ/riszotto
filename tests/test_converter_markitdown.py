@@ -41,6 +41,24 @@ class TestMarkItDownConverter:
         assert result.figures == {}
 
     @patch("riszotto.converter.markitdown.MarkItDown")
+    def test_accepts_new_perf_params(self, mock_markitdown_cls):
+        mock_md = MagicMock()
+        mock_markitdown_cls.return_value = mock_md
+        mock_result = MagicMock()
+        mock_result.markdown = "text"
+        mock_md.convert.return_value = mock_result
+
+        converter = MarkItDownConverter()
+        result = converter.convert(
+            Path("/fake/paper.pdf"),
+            zotero_key="ABC123",
+            ocr=True,
+            table_mode="accurate",
+            equation_mode="latex",
+        )
+        assert result.markdown == "text"
+
+    @patch("riszotto.converter.markitdown.MarkItDown")
     def test_suppresses_logging(self, mock_markitdown_cls):
         import logging
 
