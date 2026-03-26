@@ -25,7 +25,11 @@ from riszotto.client import (
     search_items,
 )
 from riszotto.config import load_config
-from riszotto.formatting import format_creator
+from riszotto.formatting import (
+    format_creator,
+    format_items_table,
+    format_collections_table,
+)
 
 app = typer.Typer(add_completion=False)
 
@@ -35,6 +39,15 @@ LibraryOption = Annotated[
         "--library",
         "-L",
         help="Group library name or ID (default: personal library)",
+    ),
+]
+
+FormatOption = Annotated[
+    str,
+    typer.Option(
+        "--format",
+        "-f",
+        help="Output format (table or json)",
     ),
 ]
 
@@ -241,6 +254,7 @@ def _search_all_libraries(
     direction: str | None,
     author: str | None,
     fuzzy: bool,
+    format: str,
 ) -> None:
     """Search across all libraries and output grouped results."""
     query = " ".join(terms)
@@ -279,7 +293,9 @@ def _search_all_libraries(
                 item = zot.item(hit["key"])
                 if author and not _matches_author(item, author, fuzzy=fuzzy):
                     continue
-                formatted = _format_result(item, max_value_size)
+                formatted = _format_result(
+                    item, 0 if format == "table" else max_value_size
+                )
                 formatted["score"] = hit["score"]
                 results.append(formatted)
         else:
@@ -300,7 +316,10 @@ def _search_all_libraries(
                 raw = [
                     item for item in raw if _matches_author(item, author, fuzzy=fuzzy)
                 ]
-            results = [_format_result(item, max_value_size) for item in raw]
+            results = [
+                _format_result(item, 0 if format == "table" else max_value_size)
+                for item in raw
+            ]
 
         if results:
             envelope = {
@@ -311,7 +330,14 @@ def _search_all_libraries(
             }
             grouped[lib_name] = envelope
 
-    typer.echo(json.dumps(grouped, indent=2))
+    if format == "json":
+        typer.echo(json.dumps(grouped, indent=2))
+    else:
+        parts = []
+        for lib_name, envelope in grouped.items():
+            parts.append(f"── {lib_name} ──")
+            parts.append(format_items_table(envelope["results"], semantic=semantic))
+        typer.echo("\n\n".join(parts) if parts else "No results found.")
 
 
 @app.command()
@@ -383,8 +409,13 @@ def search(
             help="Search across all accessible libraries",
         ),
     ] = False,
+    format: FormatOption = "table",
 ) -> None:
     """Search for papers in your Zotero library."""
+    if format not in ("table", "json"):
+        typer.echo(f"Unknown format: {format}. Use 'table' or 'json'.", err=True)
+        raise typer.Exit(1)
+
     if all_libraries and library:
         typer.echo("--all-libraries and --library are mutually exclusive.", err=True)
         raise typer.Exit(1)
@@ -404,6 +435,7 @@ def search(
             direction=direction,
             author=author,
             fuzzy=fuzzy,
+            format=format,
         )
         return
 
@@ -434,7 +466,7 @@ def search(
             item = zot.item(hit["key"])
             if author and not _matches_author(item, author, fuzzy=fuzzy):
                 continue
-            formatted = _format_result(item, max_value_size)
+            formatted = _format_result(item, 0 if format == "table" else max_value_size)
             formatted["score"] = hit["score"]
             results.append(formatted)
 
@@ -444,7 +476,10 @@ def search(
             "start": 0,
             "results": results,
         }
-        typer.echo(json.dumps(envelope, indent=2))
+        if format == "json":
+            typer.echo(json.dumps(envelope, indent=2))
+        else:
+            typer.echo(format_items_table(envelope["results"], semantic=True))
         return
 
     start = (page - 1) * limit
@@ -471,9 +506,20 @@ def search(
         "page": page,
         "limit": limit,
         "start": start,
-        "results": [_format_result(item, max_value_size) for item in results],
+        "results": [
+            _format_result(item, 0 if format == "table" else max_value_size)
+            for item in results
+        ],
     }
-    typer.echo(json.dumps(envelope, indent=2))
+    if format == "json":
+        typer.echo(json.dumps(envelope, indent=2))
+    else:
+        output = format_items_table(envelope["results"])
+        typer.echo(output)
+        if envelope["results"] and len(envelope["results"]) == limit:
+            typer.echo(
+                f"\nPage {page}. Next: riszotto search {' '.join(terms)} --page {page + 1}"
+            )
 
 
 @app.command()
@@ -671,8 +717,13 @@ def collections(
         ),
     ] = 200,
     library: LibraryOption = None,
+    format: FormatOption = "table",
 ) -> None:
     """List collections or items in a collection."""
+    if format not in ("table", "json"):
+        typer.echo(f"Unknown format: {format}. Use 'table' or 'json'.", err=True)
+        raise typer.Exit(1)
+
     zot = _get_zot(library=library)
     if key is None:
         cols = list_collections(zot)
@@ -686,9 +737,22 @@ def collections(
             "page": page,
             "limit": limit,
             "start": start,
-            "results": [_format_result(item, max_value_size) for item in items],
+            "results": [
+                _format_result(item, 0 if format == "table" else max_value_size)
+                for item in items
+            ],
         }
-    typer.echo(json.dumps(envelope, indent=2))
+    if format == "json":
+        typer.echo(json.dumps(envelope, indent=2))
+    elif key is None:
+        typer.echo(format_collections_table(envelope["results"]))
+    else:
+        output = format_items_table(envelope["results"])
+        typer.echo(output)
+        if envelope["results"] and len(envelope["results"]) == limit:
+            typer.echo(
+                f"\nPage {page}. Next: riszotto collections {key} --page {page + 1}"
+            )
 
 
 @app.command()
@@ -704,15 +768,26 @@ def recent(
         ),
     ] = 200,
     library: LibraryOption = None,
+    format: FormatOption = "table",
 ) -> None:
     """Show recently added papers."""
+    if format not in ("table", "json"):
+        typer.echo(f"Unknown format: {format}. Use 'table' or 'json'.", err=True)
+        raise typer.Exit(1)
+
     zot = _get_zot(library=library)
     items = recent_items(zot, limit=limit)
     envelope = {
         "limit": limit,
-        "results": [_format_result(item, max_value_size) for item in items],
+        "results": [
+            _format_result(item, 0 if format == "table" else max_value_size)
+            for item in items
+        ],
     }
-    typer.echo(json.dumps(envelope, indent=2))
+    if format == "json":
+        typer.echo(json.dumps(envelope, indent=2))
+    else:
+        typer.echo(format_items_table(envelope["results"]))
 
 
 @app.command()
