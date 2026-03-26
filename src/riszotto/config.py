@@ -5,9 +5,8 @@ from __future__ import annotations
 import dataclasses
 import os
 import tomllib
-from pathlib import Path
 
-CONFIG_PATH = Path.home() / ".riszotto" / "config.toml"
+from riszotto.paths import CONFIG_PATH
 
 
 @dataclasses.dataclass

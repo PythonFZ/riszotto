@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from riszotto.formatting import CHILD_ITEM_TYPES, format_creator
-
-INDEX_DIR = Path.home() / ".riszotto" / "chroma_db"
+from riszotto.paths import CHROMA_DIR as INDEX_DIR
 BATCH_SIZE = 500
 
 
