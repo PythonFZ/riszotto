@@ -103,3 +103,25 @@ class TestFormatItemsTable:
         output = format_items_table(results)
         lines = output.strip().splitlines()
         assert len(lines) == 3  # header + 2 rows
+
+
+from riszotto.formatting import format_collections_table
+
+
+class TestFormatCollectionsTable:
+    def test_basic_collections(self):
+        collections = [
+            {"key": "COL1", "name": "Physics"},
+            {"key": "COL2", "name": "Machine Learning"},
+        ]
+        output = format_collections_table(collections)
+        lines = output.strip().splitlines()
+        assert "KEY" in lines[0]
+        assert "NAME" in lines[0]
+        assert "COL1" in lines[1]
+        assert "Physics" in lines[1]
+        assert "COL2" in lines[2]
+
+    def test_empty_collections(self):
+        output = format_collections_table([])
+        assert output == "No results found."

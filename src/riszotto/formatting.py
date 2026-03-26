@@ -103,3 +103,25 @@ def format_items_table(results: list[dict], *, semantic: bool = False) -> str:
         lines.append("".join(row_parts))
 
     return "\n".join(lines)
+
+
+def format_collections_table(collections: list[dict]) -> str:
+    """Format collection dicts as a fixed-width table.
+
+    Parameters
+    ----------
+    collections
+        List of dicts with keys: key, name.
+
+    Returns
+    -------
+    str
+        Formatted table string, or "No results found." if empty.
+    """
+    if not collections:
+        return "No results found."
+
+    lines = [f"{'KEY':<{COL_KEY}}NAME"]
+    for c in collections:
+        lines.append(f"{c.get('key', ''):<{COL_KEY}}{c.get('name', '')}")
+    return "\n".join(lines)
