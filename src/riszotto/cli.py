@@ -25,7 +25,11 @@ from riszotto.client import (
     search_items,
 )
 from riszotto.config import load_config
-from riszotto.formatting import format_creator, format_items_table, format_collections_table
+from riszotto.formatting import (
+    format_creator,
+    format_items_table,
+    format_collections_table,
+)
 
 app = typer.Typer(add_completion=False)
 
@@ -289,7 +293,9 @@ def _search_all_libraries(
                 item = zot.item(hit["key"])
                 if author and not _matches_author(item, author, fuzzy=fuzzy):
                     continue
-                formatted = _format_result(item, 0 if format == "table" else max_value_size)
+                formatted = _format_result(
+                    item, 0 if format == "table" else max_value_size
+                )
                 formatted["score"] = hit["score"]
                 results.append(formatted)
         else:
@@ -310,7 +316,10 @@ def _search_all_libraries(
                 raw = [
                     item for item in raw if _matches_author(item, author, fuzzy=fuzzy)
                 ]
-            results = [_format_result(item, 0 if format == "table" else max_value_size) for item in raw]
+            results = [
+                _format_result(item, 0 if format == "table" else max_value_size)
+                for item in raw
+            ]
 
         if results:
             envelope = {
@@ -493,7 +502,10 @@ def search(
         "page": page,
         "limit": limit,
         "start": start,
-        "results": [_format_result(item, 0 if format == "table" else max_value_size) for item in results],
+        "results": [
+            _format_result(item, 0 if format == "table" else max_value_size)
+            for item in results
+        ],
     }
     if format == "json":
         typer.echo(json.dumps(envelope, indent=2))
@@ -501,7 +513,9 @@ def search(
         output = format_items_table(envelope["results"])
         typer.echo(output)
         if envelope["results"] and len(envelope["results"]) == limit:
-            typer.echo(f"\nPage {page}. Next: riszotto search {' '.join(terms)} --page {page + 1}")
+            typer.echo(
+                f"\nPage {page}. Next: riszotto search {' '.join(terms)} --page {page + 1}"
+            )
 
 
 @app.command()
@@ -715,7 +729,10 @@ def collections(
             "page": page,
             "limit": limit,
             "start": start,
-            "results": [_format_result(item, 0 if format == "table" else max_value_size) for item in items],
+            "results": [
+                _format_result(item, 0 if format == "table" else max_value_size)
+                for item in items
+            ],
         }
     if format == "json":
         typer.echo(json.dumps(envelope, indent=2))
@@ -725,7 +742,9 @@ def collections(
         output = format_items_table(envelope["results"])
         typer.echo(output)
         if envelope["results"] and len(envelope["results"]) == limit:
-            typer.echo(f"\nPage {page}. Next: riszotto collections {key} --page {page + 1}")
+            typer.echo(
+                f"\nPage {page}. Next: riszotto collections {key} --page {page + 1}"
+            )
 
 
 @app.command()
@@ -748,7 +767,10 @@ def recent(
     items = recent_items(zot, limit=limit)
     envelope = {
         "limit": limit,
-        "results": [_format_result(item, 0 if format == "table" else max_value_size) for item in items],
+        "results": [
+            _format_result(item, 0 if format == "table" else max_value_size)
+            for item in items
+        ],
     }
     if format == "json":
         typer.echo(json.dumps(envelope, indent=2))

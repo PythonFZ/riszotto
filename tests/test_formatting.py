@@ -1,6 +1,6 @@
 """Tests for table formatting functions."""
 
-from riszotto.formatting import format_items_table
+from riszotto.formatting import format_collections_table, format_items_table
 
 
 class TestFormatItemsTable:
@@ -103,9 +103,6 @@ class TestFormatItemsTable:
         output = format_items_table(results)
         lines = output.strip().splitlines()
         assert len(lines) == 3  # header + 2 rows
-
-
-from riszotto.formatting import format_collections_table
 
 
 class TestFormatCollectionsTable:

@@ -82,7 +82,11 @@ def format_items_table(results: list[dict], *, semantic: bool = False) -> str:
     if semantic:
         col_title -= COL_SCORE
 
-    header_parts = [f"{'KEY':<{COL_KEY}}", f"{'DATE':<{COL_DATE}}", f"{'AUTHORS':<{COL_AUTHORS}}"]
+    header_parts = [
+        f"{'KEY':<{COL_KEY}}",
+        f"{'DATE':<{COL_DATE}}",
+        f"{'AUTHORS':<{COL_AUTHORS}}",
+    ]
     if semantic:
         header_parts.append(f"{'SCORE':<{COL_SCORE}}")
     header_parts.append("TITLE")
