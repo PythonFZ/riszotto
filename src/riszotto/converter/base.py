@@ -9,6 +9,7 @@ from typing import Annotated, Literal, Protocol
 StyleOption = Literal["inline", "image"]
 BackendName = Literal["markitdown", "docling"]
 BackendOption = Annotated[StyleOption | None, "Only available with docling backend"]
+EquationMode = Literal["image", "latex"]
 
 
 @dataclass
@@ -30,4 +31,7 @@ class Converter(Protocol):
         equation_style: StyleOption = "inline",
         zotero_key: str,
         no_cache: bool = False,
+        ocr: bool = False,
+        table_mode: str = "fast",
+        equation_mode: EquationMode = "image",
     ) -> ConversionResult: ...

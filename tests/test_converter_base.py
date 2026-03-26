@@ -37,6 +37,14 @@ class TestTypeAliases:
         assert mk == "markitdown"
         assert dl == "docling"
 
+    def test_equation_mode_values(self):
+        from riszotto.converter.base import EquationMode
+
+        img: EquationMode = "image"
+        ltx: EquationMode = "latex"
+        assert img == "image"
+        assert ltx == "latex"
+
 
 class TestGetConverter:
     def test_explicit_markitdown(self):

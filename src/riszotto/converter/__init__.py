@@ -6,6 +6,7 @@ from riszotto.converter.base import (
     BackendName,
     ConversionResult,
     Converter,
+    EquationMode,
     StyleOption,
 )
 
@@ -39,6 +40,7 @@ __all__ = [
     "BackendName",
     "ConversionResult",
     "Converter",
+    "EquationMode",
     "StyleOption",
     "get_converter",
 ]
