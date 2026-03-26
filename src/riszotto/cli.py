@@ -699,6 +699,7 @@ def collections(
         ),
     ] = 200,
     library: LibraryOption = None,
+    format: FormatOption = "table",
 ) -> None:
     """List collections or items in a collection."""
     zot = _get_zot(library=library)
@@ -714,9 +715,17 @@ def collections(
             "page": page,
             "limit": limit,
             "start": start,
-            "results": [_format_result(item, max_value_size) for item in items],
+            "results": [_format_result(item, 0 if format == "table" else max_value_size) for item in items],
         }
-    typer.echo(json.dumps(envelope, indent=2))
+    if format == "json":
+        typer.echo(json.dumps(envelope, indent=2))
+    elif key is None:
+        typer.echo(format_collections_table(envelope["results"]))
+    else:
+        output = format_items_table(envelope["results"])
+        typer.echo(output)
+        if envelope["results"] and len(envelope["results"]) == limit:
+            typer.echo(f"\nPage {page}. Next: riszotto collections {key} --page {page + 1}")
 
 
 @app.command()
@@ -732,15 +741,19 @@ def recent(
         ),
     ] = 200,
     library: LibraryOption = None,
+    format: FormatOption = "table",
 ) -> None:
     """Show recently added papers."""
     zot = _get_zot(library=library)
     items = recent_items(zot, limit=limit)
     envelope = {
         "limit": limit,
-        "results": [_format_result(item, max_value_size) for item in items],
+        "results": [_format_result(item, 0 if format == "table" else max_value_size) for item in items],
     }
-    typer.echo(json.dumps(envelope, indent=2))
+    if format == "json":
+        typer.echo(json.dumps(envelope, indent=2))
+    else:
+        typer.echo(format_items_table(envelope["results"]))
 
 
 @app.command()

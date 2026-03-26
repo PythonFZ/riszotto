@@ -893,7 +893,7 @@ class TestCollections:
             {"data": {"key": "COL1", "name": "Physics", "parentCollection": False}},
             {"data": {"key": "COL2", "name": "ML", "parentCollection": "COL1"}},
         ]
-        result = runner.invoke(app, ["collections"])
+        result = runner.invoke(app, ["collections", "--format", "json"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert len(parsed["results"]) == 2
@@ -918,7 +918,7 @@ class TestCollections:
                 },
             }
         ]
-        result = runner.invoke(app, ["collections", "COL1"])
+        result = runner.invoke(app, ["collections", "--format", "json", "COL1"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["page"] == 1
@@ -933,7 +933,7 @@ class TestCollections:
         mock_get_client.return_value = MagicMock()
         mock_collection_items.return_value = []
         result = runner.invoke(
-            app, ["collections", "COL1", "--page", "3", "--limit", "10"]
+            app, ["collections", "--format", "json", "COL1", "--page", "3", "--limit", "10"]
         )
         assert result.exit_code == 0
         parsed = json.loads(result.output)
@@ -943,6 +943,20 @@ class TestCollections:
         call_args = mock_collection_items.call_args
         assert call_args[0][1] == "COL1"
         assert call_args[1] == {"limit": 10, "start": 20}
+
+    @patch("riszotto.cli.list_collections")
+    @patch("riszotto.cli.get_client")
+    def test_collections_default_table_output(self, mock_get_client, mock_list_collections):
+        mock_get_client.return_value = MagicMock()
+        mock_list_collections.return_value = [
+            {"data": {"key": "COL1", "name": "Physics", "parentCollection": False}},
+        ]
+        result = runner.invoke(app, ["collections"])
+        assert result.exit_code == 0
+        assert "KEY" in result.output
+        assert "NAME" in result.output
+        assert "COL1" in result.output
+        assert "Physics" in result.output
 
 
 class TestRecent:
@@ -963,7 +977,7 @@ class TestRecent:
                 },
             }
         ]
-        result = runner.invoke(app, ["recent"])
+        result = runner.invoke(app, ["recent", "--format", "json"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["limit"] == 10
@@ -975,7 +989,7 @@ class TestRecent:
     def test_recent_custom_limit(self, mock_get_client, mock_recent_items):
         mock_get_client.return_value = MagicMock()
         mock_recent_items.return_value = []
-        result = runner.invoke(app, ["recent", "--limit", "5"])
+        result = runner.invoke(app, ["recent", "--format", "json", "--limit", "5"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["limit"] == 5
@@ -989,6 +1003,30 @@ class TestRecent:
         result = runner.invoke(app, ["recent"])
         assert result.exit_code == 1
         assert "Zotero desktop is not running" in result.output
+
+    @patch("riszotto.cli.recent_items")
+    @patch("riszotto.cli.get_client")
+    def test_recent_default_table_output(self, mock_get_client, mock_recent_items):
+        mock_get_client.return_value = MagicMock()
+        mock_recent_items.return_value = [
+            {
+                "data": {
+                    "key": "R1",
+                    "title": "Recent Paper",
+                    "itemType": "journalArticle",
+                    "date": "2024",
+                    "creators": [],
+                    "abstractNote": "",
+                    "tags": [],
+                },
+                "meta": {},
+            }
+        ]
+        result = runner.invoke(app, ["recent"])
+        assert result.exit_code == 0
+        assert "KEY" in result.output
+        assert "R1" in result.output
+        assert "Recent Paper" in result.output
 
 
 class TestIndex:
