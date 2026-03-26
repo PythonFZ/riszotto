@@ -1,22 +1,16 @@
 # tests/test_converter_cache.py
-import json
-import time
 from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from riszotto.converter.cache import (
     CacheMeta,
-    cache_dir_for,
     compute_pdf_hash,
     read_cache,
     write_cache,
     clear_cache,
     get_cache_stats,
 )
-from riszotto.converter.base import ConversionResult
 
 
 class TestComputePdfHash:
@@ -144,14 +138,22 @@ class TestClearCache:
     def test_clear_all(self, tmp_path):
         with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
             write_cache(
-                zotero_key="K1", pdf_hash="h1h1h1h1h1h1",
-                markdown="a", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K1",
+                pdf_hash="h1h1h1h1h1h1",
+                markdown="a",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             write_cache(
-                zotero_key="K2", pdf_hash="h2h2h2h2h2h2",
-                markdown="b", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K2",
+                pdf_hash="h2h2h2h2h2h2",
+                markdown="b",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             cleared = clear_cache()
             assert cleared == 2
@@ -161,14 +163,22 @@ class TestClearCache:
     def test_clear_by_key(self, tmp_path):
         with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
             write_cache(
-                zotero_key="K1", pdf_hash="h1h1h1h1h1h1",
-                markdown="a", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K1",
+                pdf_hash="h1h1h1h1h1h1",
+                markdown="a",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             write_cache(
-                zotero_key="K2", pdf_hash="h2h2h2h2h2h2",
-                markdown="b", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K2",
+                pdf_hash="h2h2h2h2h2h2",
+                markdown="b",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             cleared = clear_cache(key="K1")
             assert cleared == 1
@@ -192,9 +202,13 @@ class TestGetCacheStats:
     def test_populated_cache(self, tmp_path):
         with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
             write_cache(
-                zotero_key="K1", pdf_hash="h1h1h1h1h1h1",
-                markdown="content here", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K1",
+                pdf_hash="h1h1h1h1h1h1",
+                markdown="content here",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             stats = get_cache_stats()
             assert stats["paper_count"] == 1
@@ -203,9 +217,13 @@ class TestGetCacheStats:
     def test_stats_for_specific_key(self, tmp_path):
         with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
             write_cache(
-                zotero_key="K1", pdf_hash="h1h1h1h1h1h1",
-                markdown="a", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K1",
+                pdf_hash="h1h1h1h1h1h1",
+                markdown="a",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             stats = get_cache_stats(key="K1")
             assert stats["paper_count"] == 1

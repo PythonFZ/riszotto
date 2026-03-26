@@ -1,7 +1,11 @@
 # tests/test_converter_base.py
-from pathlib import Path
+from unittest.mock import patch
 
-from riszotto.converter.base import ConversionResult, StyleOption, BackendName
+import pytest
+
+from riszotto.converter import get_converter
+from riszotto.converter.base import BackendName, ConversionResult, StyleOption
+from riszotto.converter.markitdown import MarkItDownConverter
 
 
 class TestConversionResult:
@@ -32,12 +36,6 @@ class TestTypeAliases:
         dl: BackendName = "docling"
         assert mk == "markitdown"
         assert dl == "docling"
-
-
-from unittest.mock import patch
-import pytest
-from riszotto.converter import get_converter
-from riszotto.converter.markitdown import MarkItDownConverter
 
 
 class TestGetConverter:

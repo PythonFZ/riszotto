@@ -1,7 +1,6 @@
 # tests/test_converter_docling.py
 import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -11,7 +10,9 @@ from riszotto.converter.base import ConversionResult
 class TestDoclingAvailableFlag:
     def test_import_error_sets_flag_false(self):
         # Force reimport with docling missing
-        with patch.dict(sys.modules, {"docling": None, "docling.document_converter": None}):
+        with patch.dict(
+            sys.modules, {"docling": None, "docling.document_converter": None}
+        ):
             # Can't easily reimport, so test the converter init behavior
             from riszotto.converter.docling import DOCLING_AVAILABLE
 
@@ -38,6 +39,7 @@ class TestDoclingConverterInit:
 # docling is not installed.  Each mock item is created as an instance of
 # its corresponding stub, and the stub is injected into the module via
 # patch(..., create=True).
+
 
 class _StubTextItem:
     pass
@@ -162,7 +164,9 @@ class TestDoclingConverterConvert:
         with (
             patch("riszotto.converter.docling.compute_pdf_hash", return_value="h"),
             patch("riszotto.converter.docling.write_cache"),
-            patch("riszotto.converter.docling.DocumentConverter", create=True) as mock_dc,
+            patch(
+                "riszotto.converter.docling.DocumentConverter", create=True
+            ) as mock_dc,
             patch("riszotto.converter.docling.PdfPipelineOptions", create=True),
             patch("riszotto.converter.docling.InputFormat", create=True),
             patch("riszotto.converter.docling.PdfFormatOption", create=True),

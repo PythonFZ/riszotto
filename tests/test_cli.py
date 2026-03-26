@@ -565,7 +565,9 @@ class TestShow:
             },
         ]
         mock_converter = MagicMock()
-        mock_converter.convert.return_value = ConversionResult(markdown="Second PDF content")
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="Second PDF content"
+        )
         mock_get_converter.return_value = mock_converter
 
         result = runner.invoke(app, ["show", "--attachment", "2", "PARENT1"])
@@ -882,9 +884,7 @@ class TestShowConverterIntegration:
                     "contentType": "application/pdf",
                     "filename": "paper.pdf",
                 },
-                "links": {
-                    "enclosure": {"href": "file:///path/to/paper.pdf"}
-                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
         mock_converter = MagicMock()

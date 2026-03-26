@@ -40,15 +40,13 @@ def check_legacy_migration() -> None:
     legacy_config = LEGACY_DIR / "config.toml"
     if legacy_config.exists() and not CONFIG_PATH.exists():
         print(
-            f"Found legacy config at {legacy_config}. "
-            f"Please move it to {CONFIG_PATH}",
+            f"Found legacy config at {legacy_config}. Please move it to {CONFIG_PATH}",
             file=sys.stderr,
         )
 
     legacy_chroma = LEGACY_DIR / "chroma_db"
     if legacy_chroma.exists() and not CHROMA_DIR.exists():
         print(
-            f"Found legacy index at {legacy_chroma}. "
-            f"Please move it to {CHROMA_DIR}",
+            f"Found legacy index at {legacy_chroma}. Please move it to {CHROMA_DIR}",
             file=sys.stderr,
         )

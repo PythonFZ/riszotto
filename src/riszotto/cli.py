@@ -26,13 +26,13 @@ from riszotto.client import (
 )
 from riszotto.config import load_config
 from riszotto.converter import get_converter
-from riszotto.converter.base import BackendName, StyleOption
 from riszotto.converter.cache import clear_cache, get_cache_stats
 from riszotto.formatting import (
     format_creator,
     format_items_table,
     format_collections_table,
 )
+
 
 def _app_callback() -> None:
     """Run startup checks."""
@@ -575,11 +575,16 @@ def show(
     ] = None,
     table_style: Annotated[
         str,
-        typer.Option("--table-style", help="Table rendering: inline or image (docling only)"),
+        typer.Option(
+            "--table-style", help="Table rendering: inline or image (docling only)"
+        ),
     ] = "inline",
     equation_style: Annotated[
         str,
-        typer.Option("--equation-style", help="Equation rendering: inline or image (docling only)"),
+        typer.Option(
+            "--equation-style",
+            help="Equation rendering: inline or image (docling only)",
+        ),
     ] = "inline",
     no_cache: Annotated[
         bool,
@@ -592,10 +597,15 @@ def show(
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
     if table_style not in ("inline", "image"):
-        typer.echo(f"Invalid --table-style: {table_style}. Use 'inline' or 'image'.", err=True)
+        typer.echo(
+            f"Invalid --table-style: {table_style}. Use 'inline' or 'image'.", err=True
+        )
         raise typer.Exit(1)
     if equation_style not in ("inline", "image"):
-        typer.echo(f"Invalid --equation-style: {equation_style}. Use 'inline' or 'image'.", err=True)
+        typer.echo(
+            f"Invalid --equation-style: {equation_style}. Use 'inline' or 'image'.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     zot = _get_zot(library=library)
@@ -1032,7 +1042,9 @@ def cache_clear(
     ] = None,
     older_than: Annotated[
         Optional[str],
-        typer.Option("--older-than", help="Clear entries older than duration (e.g., 30d)"),
+        typer.Option(
+            "--older-than", help="Clear entries older than duration (e.g., 30d)"
+        ),
     ] = None,
 ) -> None:
     """Clear cached conversions."""

@@ -1,9 +1,5 @@
 # tests/test_paths.py
-import os
-from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 
 class TestPaths:
@@ -58,7 +54,9 @@ class TestLegacyMigration:
         new_chroma = tmp_path / "new_data" / "chroma_db"
         with (
             patch("riszotto.paths.LEGACY_DIR", legacy),
-            patch("riszotto.paths.CONFIG_PATH", tmp_path / "new_config" / "config.toml"),
+            patch(
+                "riszotto.paths.CONFIG_PATH", tmp_path / "new_config" / "config.toml"
+            ),
             patch("riszotto.paths.CHROMA_DIR", new_chroma),
             patch("riszotto.paths.config_dir", return_value=tmp_path / "new_config"),
         ):

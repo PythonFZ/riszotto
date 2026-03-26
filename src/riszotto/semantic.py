@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from riszotto.formatting import CHILD_ITEM_TYPES, format_creator
 from riszotto.paths import CHROMA_DIR as INDEX_DIR
+
 BATCH_SIZE = 500
 
 
