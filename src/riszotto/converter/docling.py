@@ -79,10 +79,7 @@ class DoclingConverter:
             if cached is not None:
                 return cached
 
-        needs_page_images = (
-            table_style == "image"
-            or equation_mode == "image"
-        )
+        needs_page_images = table_style == "image" or equation_mode == "image"
 
         print("Converting PDF with docling...", file=sys.stderr)
 
@@ -162,9 +159,7 @@ class DoclingConverter:
                     elif element.text:
                         parts.append(f"$${element.text}$$")
                     else:
-                        parts.append(
-                            f"[Equation {equation_count}: not available]"
-                        )
+                        parts.append(f"[Equation {equation_count}: not available]")
 
             elif isinstance(element, TextItem):
                 parts.append(element.text)

@@ -600,11 +600,15 @@ def show(
     ] = False,
     table_mode: Annotated[
         str,
-        typer.Option("--table-mode", help="Table extraction: fast or accurate (docling only)"),
+        typer.Option(
+            "--table-mode", help="Table extraction: fast or accurate (docling only)"
+        ),
     ] = "fast",
     equations: Annotated[
         str,
-        typer.Option("--equations", help="Equation rendering: image or latex (docling only)"),
+        typer.Option(
+            "--equations", help="Equation rendering: image or latex (docling only)"
+        ),
     ] = "image",
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
