@@ -412,6 +412,10 @@ def search(
     format: FormatOption = "table",
 ) -> None:
     """Search for papers in your Zotero library."""
+    if format not in ("table", "json"):
+        typer.echo(f"Unknown format: {format}. Use 'table' or 'json'.", err=True)
+        raise typer.Exit(1)
+
     if all_libraries and library:
         typer.echo("--all-libraries and --library are mutually exclusive.", err=True)
         raise typer.Exit(1)
@@ -716,6 +720,10 @@ def collections(
     format: FormatOption = "table",
 ) -> None:
     """List collections or items in a collection."""
+    if format not in ("table", "json"):
+        typer.echo(f"Unknown format: {format}. Use 'table' or 'json'.", err=True)
+        raise typer.Exit(1)
+
     zot = _get_zot(library=library)
     if key is None:
         cols = list_collections(zot)
@@ -763,6 +771,10 @@ def recent(
     format: FormatOption = "table",
 ) -> None:
     """Show recently added papers."""
+    if format not in ("table", "json"):
+        typer.echo(f"Unknown format: {format}. Use 'table' or 'json'.", err=True)
+        raise typer.Exit(1)
+
     zot = _get_zot(library=library)
     items = recent_items(zot, limit=limit)
     envelope = {

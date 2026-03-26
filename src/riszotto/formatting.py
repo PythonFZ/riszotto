@@ -101,7 +101,7 @@ def format_items_table(results: list[dict], *, semantic: bool = False) -> str:
             f"{_truncate(authors, COL_AUTHORS - 1):<{COL_AUTHORS}}",
         ]
         if semantic:
-            score = r.get("score", 0)
+            score = float(r.get("score", 0))
             row_parts.append(f"{score:<{COL_SCORE}.2f}")
         row_parts.append(_truncate(r.get("title", ""), col_title))
         lines.append("".join(row_parts))

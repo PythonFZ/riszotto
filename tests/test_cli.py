@@ -1453,6 +1453,26 @@ class TestFuzzyAuthorMatching:
         assert len(parsed["results"]) == 1
 
 
+class TestFormatValidation:
+    @patch("riszotto.cli.get_client")
+    def test_search_invalid_format(self, mock_get_client):
+        result = runner.invoke(app, ["search", "--format", "csv", "test"])
+        assert result.exit_code == 1
+        assert "Unknown format" in result.output
+
+    @patch("riszotto.cli.get_client")
+    def test_collections_invalid_format(self, mock_get_client):
+        result = runner.invoke(app, ["collections", "--format", "xml"])
+        assert result.exit_code == 1
+        assert "Unknown format" in result.output
+
+    @patch("riszotto.cli.get_client")
+    def test_recent_invalid_format(self, mock_get_client):
+        result = runner.invoke(app, ["recent", "--format", "tabel"])
+        assert result.exit_code == 1
+        assert "Unknown format" in result.output
+
+
 class TestAllLibrariesSearch:
     def test_mutually_exclusive_with_library(self):
         result = runner.invoke(
@@ -1504,6 +1524,39 @@ class TestAllLibrariesSearch:
         assert "My Library" in parsed
         assert "Empty Group" not in parsed
         assert len(parsed["My Library"]["results"]) == 1
+
+    @patch("riszotto.cli._discover_libraries")
+    def test_grouped_output_table(self, mock_discover):
+        mock_zot1 = MagicMock()
+        mock_zot1.items.return_value = [
+            {
+                "data": {
+                    "key": "K1",
+                    "title": "Paper One",
+                    "itemType": "journalArticle",
+                    "date": "2023",
+                    "abstractNote": "",
+                    "creators": [],
+                    "tags": [],
+                },
+            },
+        ]
+        mock_discover.return_value = [
+            {
+                "name": "My Library",
+                "id": "0",
+                "type": "user",
+                "source": "local",
+                "client": mock_zot1,
+            },
+        ]
+
+        result = runner.invoke(app, ["search", "--all-libraries", "test"])
+        assert result.exit_code == 0
+        assert "── My Library ──" in result.output
+        assert "KEY" in result.output
+        assert "K1" in result.output
+        assert "Paper One" in result.output
 
     @patch("riszotto.cli._discover_libraries")
     def test_no_libraries_found(self, mock_discover):
