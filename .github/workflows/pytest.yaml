@@ -11,6 +11,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
+        extras: ["semantic", "full"]
     steps:
       - uses: actions/checkout@v4
 
@@ -18,5 +19,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install with [${{ matrix.extras }}] extras
+        run: uv sync --extra ${{ matrix.extras }}
+
       - name: Run tests
-        run: uv run --all-extras pytest
+        run: uv run pytest

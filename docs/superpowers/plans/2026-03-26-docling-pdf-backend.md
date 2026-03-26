@@ -31,6 +31,7 @@
 | Create | `tests/test_converter_cache.py` | Tests for cache operations |
 | Modify | `tests/test_cli.py` | Update `show` tests for converter, add cache command tests |
 | Modify | `tests/test_config.py` | Update to patch `paths.CONFIG_PATH` |
+| Modify | `.github/workflows/pytest.yaml` | Test both `[semantic]` and `[full]` extras in CI matrix |
 
 ---
 
@@ -2049,7 +2050,56 @@ git commit -m "feat: add legacy ~/.riszotto migration check on CLI startup"
 
 ---
 
-### Task 12: Run pre-commit and full validation
+### Task 12: Update CI to test both extras configurations
+
+**Files:**
+- Modify: `.github/workflows/pytest.yaml`
+
+- [ ] **Step 1: Update CI workflow**
+
+Replace `.github/workflows/pytest.yaml` with:
+
+```yaml
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        extras: ["semantic", "full"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install with [${{ matrix.extras }}] extras
+        run: uv sync --extra ${{ matrix.extras }}
+
+      - name: Run tests
+        run: uv run pytest
+```
+
+This creates a 3x2 matrix: 3 Python versions x 2 extras configurations (`[semantic]` and `[full]`). The `[full]` extra includes `[semantic]` (self-referential), so the full config tests everything. The `[semantic]` config tests that the base + semantic install works without docling.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add .github/workflows/pytest.yaml
+git commit -m "ci: test both [semantic] and [full] extras in CI matrix"
+```
+
+---
+
+### Task 13: Run pre-commit and full validation
 
 **Files:** none (validation only)
 
