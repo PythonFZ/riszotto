@@ -1,4 +1,5 @@
 import json
+import pytest
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -38,7 +39,7 @@ class TestSearch:
                 "meta": {"creatorSummary": "Vaswani et al."},
             }
         ]
-        result = runner.invoke(app, ["search", "attention"])
+        result = runner.invoke(app, ["search", "--format", "json", "attention"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["page"] == 1
@@ -59,7 +60,7 @@ class TestSearch:
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = []
-        result = runner.invoke(app, ["search", "nonexistent"])
+        result = runner.invoke(app, ["search", "--format", "json", "nonexistent"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["results"] == []
@@ -106,7 +107,7 @@ class TestSearch:
         mock_zot = MagicMock()
         mock_get_client.return_value = mock_zot
         mock_zot.items.return_value = []
-        result = runner.invoke(app, ["search", "--page", "2", "--limit", "10", "test"])
+        result = runner.invoke(app, ["search", "--format", "json", "--page", "2", "--limit", "10", "test"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["page"] == 2
@@ -132,7 +133,7 @@ class TestSearch:
                 "meta": {},
             }
         ]
-        result = runner.invoke(app, ["search", "test"])
+        result = runner.invoke(app, ["search", "--format", "json", "test"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["results"][0]["abstract"] == "<hidden (300 chars)>"
@@ -156,7 +157,7 @@ class TestSearch:
                 "meta": {},
             }
         ]
-        result = runner.invoke(app, ["search", "--max-value-size", "0", "test"])
+        result = runner.invoke(app, ["search", "--format", "json", "--max-value-size", "0", "test"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["results"][0]["abstract"] == long_abstract
@@ -180,7 +181,7 @@ class TestSearch:
                 "meta": {},
             }
         ]
-        result = runner.invoke(app, ["search", "test"])
+        result = runner.invoke(app, ["search", "--format", "json", "test"])
         parsed = json.loads(result.output)
         assert parsed["results"][0]["authors"] == ["WHO"]
 
@@ -263,11 +264,49 @@ class TestSearch:
                 },
             },
         ]
-        result = runner.invoke(app, ["search", "--author", "smith", "test"])
+        result = runner.invoke(app, ["search", "--format", "json", "--author", "smith", "test"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert len(parsed["results"]) == 1
         assert parsed["results"][0]["key"] == "K1"
+
+    @patch("riszotto.cli.get_client")
+    def test_search_no_results_table_output(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = []
+        result = runner.invoke(app, ["search", "nonexistent"])
+        assert result.exit_code == 0
+        assert "No results found." in result.output
+
+    @patch("riszotto.cli.get_client")
+    def test_search_default_table_output(self, mock_get_client):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.items.return_value = [
+            {
+                "data": {
+                    "key": "ABC12345",
+                    "title": "Attention Is All You Need",
+                    "itemType": "journalArticle",
+                    "date": "2017-06-12",
+                    "creators": [{"firstName": "Ashish", "lastName": "Vaswani", "creatorType": "author"}],
+                    "abstractNote": "",
+                    "tags": [],
+                },
+                "meta": {},
+            }
+        ]
+        result = runner.invoke(app, ["search", "attention"])
+        assert result.exit_code == 0
+        assert "KEY" in result.output
+        assert "ABC12345" in result.output
+        assert "2017" in result.output
+        assert "Vaswani, Ashish" in result.output
+        # Verify it's NOT json
+        import json
+        with pytest.raises(json.JSONDecodeError):
+            json.loads(result.output)
 
 
 class TestSearchSemantic:
@@ -315,7 +354,7 @@ class TestSearchSemantic:
             },
         }[key]
 
-        result = runner.invoke(app, ["search", "--semantic", "attention mechanisms"])
+        result = runner.invoke(app, ["search", "--format", "json", "--semantic", "attention mechanisms"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert len(parsed["results"]) == 2
@@ -333,7 +372,7 @@ class TestSearchSemantic:
         mock_import_semantic.return_value = mock_semantic
         mock_semantic.semantic_search.return_value = []
 
-        result = runner.invoke(app, ["search", "--semantic", "nonexistent"])
+        result = runner.invoke(app, ["search", "--format", "json", "--semantic", "nonexistent"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert parsed["results"] == []
@@ -403,7 +442,7 @@ class TestSearchSemantic:
         }[key]
 
         result = runner.invoke(
-            app, ["search", "--semantic", "--author", "jones", "test"]
+            app, ["search", "--format", "json", "--semantic", "--author", "jones", "test"]
         )
         assert result.exit_code == 0
         parsed = json.loads(result.output)
@@ -1256,7 +1295,7 @@ class TestFuzzyAuthorMatching:
                 },
             },
         ]
-        result = runner.invoke(app, ["search", "--author", "magdau", "ML"])
+        result = runner.invoke(app, ["search", "--format", "json", "--author", "magdau", "ML"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert len(parsed["results"]) == 1
@@ -1285,7 +1324,7 @@ class TestFuzzyAuthorMatching:
             },
         ]
         # "magdeu" is a typo — not a substring of "magdau", needs --fuzzy
-        result = runner.invoke(app, ["search", "--author", "magdeu", "ML"])
+        result = runner.invoke(app, ["search", "--format", "json", "--author", "magdeu", "ML"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert len(parsed["results"]) == 0
@@ -1313,7 +1352,7 @@ class TestFuzzyAuthorMatching:
                 },
             },
         ]
-        result = runner.invoke(app, ["search", "--author", "bogdau", "--fuzzy", "ML"])
+        result = runner.invoke(app, ["search", "--format", "json", "--author", "bogdau", "--fuzzy", "ML"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert len(parsed["results"]) == 1
@@ -1341,7 +1380,7 @@ class TestFuzzyAuthorMatching:
                 },
             },
         ]
-        result = runner.invoke(app, ["search", "--author", "schafer", "ML"])
+        result = runner.invoke(app, ["search", "--format", "json", "--author", "schafer", "ML"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert len(parsed["results"]) == 1
@@ -1390,7 +1429,7 @@ class TestAllLibrariesSearch:
             },
         ]
 
-        result = runner.invoke(app, ["search", "--all-libraries", "test"])
+        result = runner.invoke(app, ["search", "--format", "json", "--all-libraries", "test"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert "My Library" in parsed
@@ -1455,7 +1494,7 @@ class TestAllLibrariesSearch:
             },
         }
 
-        result = runner.invoke(app, ["search", "--all-libraries", "--semantic", "test"])
+        result = runner.invoke(app, ["search", "--format", "json", "--all-libraries", "--semantic", "test"])
         assert result.exit_code == 0
         parsed = json.loads(result.output)
         assert "My Library" in parsed
