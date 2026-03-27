@@ -127,6 +127,10 @@ def build_index(
             {
                 "title": data.get("title", ""),
                 "itemType": data.get("itemType", ""),
+                "creators": "; ".join(
+                    format_creator(c) for c in data.get("creators", [])
+                ),
+                "date": data.get("date", ""),
             }
         )
 
@@ -171,11 +175,125 @@ def semantic_search(
                 "key": key,
                 "title": meta.get("title", ""),
                 "itemType": meta.get("itemType", ""),
+                "creators": meta.get("creators", ""),
+                "date": meta.get("date", ""),
                 "score": score,
             }
         )
 
     return output
+
+
+MAX_GRAPH_NODES = 50
+MAX_NEIGHBORS_PER_NODE = 10
+
+
+def get_neighbors(
+    item_key: str,
+    *,
+    cutoff: float = 0.35,
+    depth: int = 2,
+    collection_name: str = "user_0",
+) -> dict:
+    """Build a similarity graph around a paper.
+
+    Parameters
+    ----------
+    item_key : str
+        Zotero item key to center the graph on.
+    cutoff : float
+        Minimum similarity score (0-1) for an edge.
+    depth : int
+        How many hops from the center node to expand.
+    collection_name : str
+        ChromaDB collection to query.
+
+    Returns
+    -------
+    dict
+        Graph with "nodes" and "edges" lists. Capped at MAX_GRAPH_NODES.
+    """
+    collection = _get_collection(collection_name=collection_name)
+
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    seen_keys: set[str] = set()
+
+    # Get center node embedding
+    center = collection.get(ids=[item_key], include=["embeddings", "metadatas"])
+    if not center["ids"]:
+        return {"nodes": [], "edges": []}
+
+    center_meta = center["metadatas"][0]
+    center_embedding = center["embeddings"][0]
+
+    nodes.append(
+        {
+            "key": item_key,
+            "title": center_meta.get("title", ""),
+            "itemType": center_meta.get("itemType", ""),
+            "creators": center_meta.get("creators", ""),
+            "date": center_meta.get("date", ""),
+            "depth": 0,
+            "score": 1.0,
+        }
+    )
+    seen_keys.add(item_key)
+
+    # BFS expansion
+    frontier = [(item_key, center_embedding, 0)]  # (key, embedding, current_depth)
+
+    while frontier and len(nodes) < MAX_GRAPH_NODES:
+        source_key, embedding, current_depth = frontier.pop(0)
+
+        if current_depth >= depth:
+            continue
+
+        results = collection.query(
+            query_embeddings=[embedding],
+            n_results=MAX_NEIGHBORS_PER_NODE + 1,  # +1 to account for self
+            include=["metadatas", "distances", "embeddings"],
+        )
+
+        for i, neighbor_key in enumerate(results["ids"][0]):
+            if neighbor_key == source_key:
+                continue
+            if len(nodes) >= MAX_GRAPH_NODES:
+                break
+
+            distance = results["distances"][0][i]
+            similarity = round(1 - distance, 4)
+
+            if similarity < cutoff:
+                continue
+
+            meta = results["metadatas"][0][i]
+            neighbor_embedding = results["embeddings"][0][i]
+
+            edges.append(
+                {
+                    "source": source_key,
+                    "target": neighbor_key,
+                    "similarity": similarity,
+                }
+            )
+
+            if neighbor_key not in seen_keys:
+                seen_keys.add(neighbor_key)
+                nodes.append(
+                    {
+                        "key": neighbor_key,
+                        "title": meta.get("title", ""),
+                        "itemType": meta.get("itemType", ""),
+                        "creators": meta.get("creators", ""),
+                        "date": meta.get("date", ""),
+                        "depth": current_depth + 1,
+                        "score": similarity,
+                    }
+                )
+                frontier.append((neighbor_key, neighbor_embedding, current_depth + 1))
+
+    return {"nodes": nodes, "edges": edges}
 
 
 def get_index_status(*, collection_name: str = "user_0") -> dict:

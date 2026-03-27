@@ -548,3 +548,53 @@ class TestGetClientWithLibrary:
 
         with pytest.raises(AmbiguousLibraryError, match="multiple"):
             get_client(library="Lab")
+
+
+class TestDiscoverLibraries:
+    """Tests for discover_libraries()."""
+
+    def test_returns_personal_library(self):
+        """Personal library is always included."""
+        mock_config = MagicMock()
+        mock_config.has_remote_credentials = False
+
+        with (
+            patch("riszotto.client.get_client") as mock_get,
+            patch("riszotto.client.load_config", return_value=mock_config),
+        ):
+            mock_zot = MagicMock()
+            mock_zot.groups.return_value = []
+            mock_get.return_value = mock_zot
+
+            from riszotto.client import discover_libraries
+
+            libs = discover_libraries()
+
+        assert len(libs) >= 1
+        assert libs[0]["name"] == "My Library"
+        assert libs[0]["type"] == "user"
+
+    def test_includes_local_groups(self):
+        """Local groups from Zotero are discovered."""
+        mock_zot = MagicMock()
+        mock_config = MagicMock()
+        mock_config.has_remote_credentials = False
+
+        mock_group = {
+            "id": 12345,
+            "data": {"name": "Lab Papers", "id": 12345},
+        }
+        mock_zot.groups.return_value = [mock_group]
+
+        with (
+            patch("riszotto.client.get_client", return_value=mock_zot),
+            patch("riszotto.client.load_config", return_value=mock_config),
+        ):
+            from riszotto.client import discover_libraries
+
+            libs = discover_libraries()
+
+        group_libs = [l for l in libs if l["type"] == "group"]
+        assert len(group_libs) == 1
+        assert group_libs[0]["name"] == "Lab Papers"
+        assert group_libs[0]["id"] == "12345"  # stored as string for consistency
