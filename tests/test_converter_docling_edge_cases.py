@@ -8,9 +8,9 @@ import pytest
 
 docling = pytest.importorskip("docling")
 
-from docling_core.types.doc import FormulaItem, PictureItem, TableItem
+from docling_core.types.doc import FormulaItem, PictureItem, TableItem  # noqa: E402
 
-from riszotto.converter.docling import _process_items
+from riszotto.converter.docling import _process_items  # noqa: E402
 
 
 class TestProcessItemsEdgeCases:

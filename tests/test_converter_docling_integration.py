@@ -10,7 +10,7 @@ import pytest
 
 docling = pytest.importorskip("docling")
 
-from riszotto.converter.docling import DoclingConverter
+from riszotto.converter.docling import DoclingConverter  # noqa: E402
 
 ARXIV_ID = "2310.06825"
 ARXIV_URL = f"https://arxiv.org/pdf/{ARXIV_ID}"
