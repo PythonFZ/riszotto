@@ -7,7 +7,7 @@ description: Use when the user asks to search, read, or export papers from their
 
 CLI for searching, reading, and exporting papers from Zotero. Run via `riszotto <command>`. Requires Zotero desktop running with local API enabled.
 
-If `riszotto` is not found, instruct the user to install it: `uv tool install riszotto` (or `uv tool install "riszotto[semantic]"` for semantic search support). This makes it globally available and updateable via `uv tool upgrade riszotto`.
+If `riszotto` is not found, instruct the user to install it: `uv tool install riszotto` (or `uv tool install "riszotto[semantic]"` for semantic search support).
 
 Default: personal library. Use `-L "Name"` for groups, `-A` for all libraries. Discover with `riszotto libraries`.
 
