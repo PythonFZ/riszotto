@@ -3,6 +3,8 @@ name = "riszotto"
 dynamic = ["version"]
 description = "CLI tool for searching and reading papers from a local Zotero library"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "typer>=0.9.0",
