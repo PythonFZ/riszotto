@@ -42,7 +42,14 @@ def _save_element_image(element, doc, dest: Path) -> bool:
     return True
 
 
-def _process_items(items, doc, cache_path: Path, *, table_style: StyleOption, equation_mode: EquationMode) -> tuple[list[str], dict[str, Path]]:
+def _process_items(
+    items,
+    doc,
+    cache_path: Path,
+    *,
+    table_style: StyleOption,
+    equation_mode: EquationMode,
+) -> tuple[list[str], dict[str, Path]]:
     """Convert docling document items into markdown parts and figure paths.
 
     Parameters

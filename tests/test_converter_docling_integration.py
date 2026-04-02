@@ -70,10 +70,14 @@ def test_different_table_styles(arxiv_pdf, tmp_path):
     with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
         converter = DoclingConverter()
         inline_result = converter.convert(
-            arxiv_pdf, zotero_key="TABLE_INLINE", table_style="inline",
+            arxiv_pdf,
+            zotero_key="TABLE_INLINE",
+            table_style="inline",
         )
         image_result = converter.convert(
-            arxiv_pdf, zotero_key="TABLE_IMAGE", table_style="image",
+            arxiv_pdf,
+            zotero_key="TABLE_IMAGE",
+            table_style="image",
         )
     assert len(inline_result.markdown) > 100
     assert len(image_result.markdown) > 100
