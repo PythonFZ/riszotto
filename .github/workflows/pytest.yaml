@@ -18,5 +18,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install with [full] extras
+        run: uv sync --extra full
+
       - name: Run tests
-        run: uv run --all-extras pytest
+        run: uv run pytest

@@ -9,3 +9,6 @@ _version.py
 
 # Virtual environments
 .venv
+
+# Test fixtures cache
+tests/.cache/

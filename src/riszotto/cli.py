@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import unicodedata
+from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
-from markitdown import MarkItDown
 from pyzotero import zotero
 from pyzotero.zotero_errors import PyZoteroError
 
@@ -25,13 +25,23 @@ from riszotto.client import (
     search_items,
 )
 from riszotto.config import load_config
+from riszotto.converter import get_converter
+from riszotto.converter.cache import clear_cache, get_cache_stats
 from riszotto.formatting import (
     format_creator,
     format_items_table,
     format_collections_table,
 )
 
-app = typer.Typer(add_completion=False)
+
+def _app_callback() -> None:
+    """Run startup checks."""
+    from riszotto.paths import check_legacy_migration
+
+    check_legacy_migration()
+
+
+app = typer.Typer(add_completion=False, callback=_app_callback)
 
 LibraryOption = Annotated[
     Optional[str],
@@ -522,6 +532,24 @@ def search(
             )
 
 
+def _get_cached_figures(zotero_key: str) -> dict[str, Path] | None:
+    """Look up cached figures for a paper. Returns None if no cache exists."""
+    from riszotto.converter.cache import CONVERSION_CACHE_DIR
+
+    key_dir = CONVERSION_CACHE_DIR / zotero_key
+    if not key_dir.exists():
+        return None
+    for hash_dir in key_dir.iterdir():
+        if hash_dir.is_dir():
+            figs = {
+                f.name: f
+                for f in hash_dir.iterdir()
+                if f.suffix in (".png", ".jpg", ".jpeg")
+            }
+            return figs if figs else None
+    return None
+
+
 @app.command()
 def show(
     key: Annotated[str, typer.Argument(help="Zotero item key")],
@@ -541,9 +569,97 @@ def show(
         typer.Option("--context", "-C", help="Context lines around each search match"),
     ] = 3,
     library: LibraryOption = None,
+    backend: Annotated[
+        Optional[str],
+        typer.Option("--backend", help="Converter backend (markitdown or docling)"),
+    ] = None,
+    table_style: Annotated[
+        str,
+        typer.Option(
+            "--table-style", help="Table rendering: inline or image (docling only)"
+        ),
+    ] = "inline",
+    equation_style: Annotated[
+        str,
+        typer.Option(
+            "--equation-style",
+            help="Equation rendering: inline or image (docling only)",
+        ),
+    ] = "inline",
+    no_cache: Annotated[
+        bool,
+        typer.Option("--no-cache", help="Force re-processing (skip cache)"),
+    ] = False,
+    figure: Annotated[
+        Optional[int],
+        typer.Option("--figure", help="Display path to cached figure N (1-indexed)"),
+    ] = None,
+    ocr: Annotated[
+        bool,
+        typer.Option("--ocr", help="Enable OCR for scanned PDFs (off by default)"),
+    ] = False,
+    table_mode: Annotated[
+        str,
+        typer.Option(
+            "--table-mode", help="Table extraction: fast or accurate (docling only)"
+        ),
+    ] = "fast",
+    equations: Annotated[
+        str,
+        typer.Option(
+            "--equations", help="Equation rendering: image or latex (docling only)"
+        ),
+    ] = "image",
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
+    if table_style not in ("inline", "image"):
+        typer.echo(
+            f"Invalid --table-style: {table_style}. Use 'inline' or 'image'.", err=True
+        )
+        raise typer.Exit(1)
+    if equation_style not in ("inline", "image"):
+        typer.echo(
+            f"Invalid --equation-style: {equation_style}. Use 'inline' or 'image'.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    if table_mode not in ("fast", "accurate"):
+        typer.echo(
+            f"Invalid --table-mode: {table_mode}. Use 'fast' or 'accurate'.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    if equations not in ("image", "latex"):
+        typer.echo(
+            f"Invalid --equations: {equations}. Use 'image' or 'latex'.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     zot = _get_zot(library=library)
+
+    # Handle --figure flag (reads from cache, no conversion)
+    if figure is not None:
+        figures = _get_cached_figures(key)
+        if figures is None:
+            typer.echo(
+                f"No cached conversion for {key}. Run 'riszotto show {key}' with docling first.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        sorted_figs = sorted(
+            [(n, p) for n, p in figures.items() if n.startswith("figure_")],
+            key=lambda x: x[0],
+        )
+        if figure < 1 or figure > len(sorted_figs):
+            typer.echo(
+                f"Paper has {len(sorted_figs)} figure(s) (1-{len(sorted_figs)}). "
+                f"Use --figure 1 through --figure {len(sorted_figs)}.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        typer.echo(str(sorted_figs[figure - 1][1]))
+        return
 
     pdfs = get_pdf_attachments(zot, key)
     if not pdfs:
@@ -572,17 +688,30 @@ def show(
         raise typer.Exit(1)
 
     try:
-        import logging
+        converter = get_converter(backend)
+        result = converter.convert(
+            Path(file_path),
+            table_style=table_style,
+            equation_style=equation_style,
+            zotero_key=key,
+            no_cache=no_cache,
+            ocr=ocr,
+            table_mode=table_mode,
+            equation_mode=equations,
+        )
+        markdown = result.markdown
 
-        logging.disable(logging.CRITICAL)
-        try:
-            md = MarkItDown()
-            result = md.convert(file_path)
-            markdown = result.markdown
-        finally:
-            logging.disable(logging.NOTSET)
+        if len(markdown) < 100 and not ocr:
+            typer.echo(
+                "Very little text extracted. If this is a scanned PDF, "
+                f"try: riszotto show --ocr {key}",
+                err=True,
+            )
+    except ImportError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
     except Exception as e:
-        typer.echo(f"Failed to convert PDF to markdown: {e}", err=True)
+        typer.echo(f"Failed to convert PDF: {e}", err=True)
         raise typer.Exit(1)
 
     if search is not None:
@@ -897,3 +1026,75 @@ def libraries() -> None:
             f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {str(lib['items']):<8} {str(lib['indexed']):<8} {lib['source']}"
         )
     typer.echo("\n".join(lines))
+
+
+# ── Cache command group ──────────────────────────────────────────────
+
+cache_app = typer.Typer(add_completion=False, help="Manage the conversion cache.")
+app.add_typer(cache_app, name="cache")
+
+
+def _format_bytes(n: int) -> str:
+    """Format byte count as human-readable string."""
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024:
+            return f"{n:.1f} {unit}" if unit != "B" else f"{n} {unit}"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+@cache_app.command("show")
+def cache_show(
+    key: Annotated[
+        Optional[str],
+        typer.Option("--key", "-k", help="Show cache for a specific paper"),
+    ] = None,
+) -> None:
+    """Show cache statistics."""
+    stats = get_cache_stats(key=key)
+    if key and stats["paper_count"] == 0:
+        typer.echo(f"No cached data for {key}.")
+        return
+    typer.echo(
+        f"Cache: {stats['paper_count']} paper(s), "
+        f"{_format_bytes(stats['total_bytes'])}. "
+        f"Path: {stats['path']}"
+    )
+    if stats.get("papers"):
+        for p in stats["papers"]:
+            typer.echo(f"  {p['key']}: {_format_bytes(p['bytes'])}")
+
+
+def _parse_duration(s: str) -> int | None:
+    """Parse a duration string like '30d' into days. Returns None on failure."""
+    if s.endswith("d") and s[:-1].isdigit():
+        return int(s[:-1])
+    return None
+
+
+@cache_app.command("clear")
+def cache_clear(
+    key: Annotated[
+        Optional[str],
+        typer.Option("--key", "-k", help="Clear cache for a specific paper"),
+    ] = None,
+    older_than: Annotated[
+        Optional[str],
+        typer.Option(
+            "--older-than", help="Clear entries older than duration (e.g., 30d)"
+        ),
+    ] = None,
+) -> None:
+    """Clear cached conversions."""
+    older_than_days = None
+    if older_than is not None:
+        older_than_days = _parse_duration(older_than)
+        if older_than_days is None:
+            typer.echo(
+                "Invalid duration format. Use <N>d, e.g., --older-than 30d",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+    cleared = clear_cache(key=key, older_than_days=older_than_days)
+    typer.echo(f"Cleared {cleared} paper(s) from cache.")
