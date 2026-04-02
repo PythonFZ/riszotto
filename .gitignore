@@ -12,3 +12,6 @@ _version.py
 
 # Test fixtures cache
 tests/.cache/
+
+# Git worktrees
+.worktrees/
