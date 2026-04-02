@@ -32,12 +32,11 @@ from riszotto.formatting import (
     format_items_table,
     format_collections_table,
 )
+from riszotto.paths import CONFIG_PATH, check_legacy_migration
 
 
 def _app_callback() -> None:
     """Run startup checks."""
-    from riszotto.paths import check_legacy_migration
-
     check_legacy_migration()
 
 
@@ -965,7 +964,7 @@ def libraries() -> None:
             typer.echo(
                 "Zotero desktop is not running and no remote config found. "
                 "Start Zotero or configure api_key and user_id in "
-                "~/.riszotto/config.toml.",
+                f"{CONFIG_PATH}.",
                 err=True,
             )
             raise typer.Exit(1)

@@ -11,6 +11,7 @@ from pyzotero.zotero_errors import PyZoteroError
 
 from riszotto.config import load_config
 from riszotto.formatting import CHILD_ITEM_TYPES
+from riszotto.paths import CONFIG_PATH
 
 DEFAULT_BIBTEX_EXCLUDE: set[str] = {
     "file",
@@ -133,7 +134,7 @@ def get_client(library: str | None = None) -> zotero.Zotero:
     if not config.has_remote_credentials:
         raise LibraryNotFoundError(
             f"Group '{library}' not found locally. "
-            "Configure api_key and user_id in ~/.riszotto/config.toml "
+            f"Configure api_key and user_id in {CONFIG_PATH} "
             "for remote access."
         )
 
