@@ -34,14 +34,7 @@ from riszotto.formatting import (
 )
 
 
-def _app_callback() -> None:
-    """Run startup checks."""
-    from riszotto.paths import check_legacy_migration
-
-    check_legacy_migration()
-
-
-app = typer.Typer(add_completion=False, callback=_app_callback)
+app = typer.Typer(add_completion=False)
 
 LibraryOption = Annotated[
     Optional[str],
