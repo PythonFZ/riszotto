@@ -42,6 +42,81 @@ def _save_element_image(element, doc, dest: Path) -> bool:
     return True
 
 
+def _process_items(items, doc, cache_path: Path, *, table_style: StyleOption, equation_mode: EquationMode) -> tuple[list[str], dict[str, Path]]:
+    """Convert docling document items into markdown parts and figure paths.
+
+    Parameters
+    ----------
+    items
+        Iterable of ``(element, level)`` tuples from ``doc.iterate_items()``.
+    doc
+        The docling document object (passed to ``get_image`` / ``export_to_dataframe``).
+    cache_path
+        Directory where extracted images are saved.
+    table_style
+        ``"inline"`` for markdown tables, ``"image"`` for PNG screenshots.
+    equation_mode
+        ``"latex"`` for LaTeX fallback, ``"image"`` for PNG screenshots.
+
+    Returns
+    -------
+    tuple[list[str], dict[str, Path]]
+        ``(parts, figures)`` — markdown fragments and a mapping of
+        filename to saved image path.
+    """
+    parts: list[str] = []
+    figures: dict[str, Path] = {}
+    figure_count = 0
+    table_count = 0
+    equation_count = 0
+
+    for element, _level in items:
+        if isinstance(element, PictureItem):
+            figure_count += 1
+            filename = f"figure_{figure_count}.png"
+            fig_path = cache_path / filename
+            if _save_element_image(element, doc, fig_path):
+                figures[filename] = fig_path
+                parts.append(f"![Figure {figure_count}]({fig_path})")
+            else:
+                parts.append(f"[Figure {figure_count}: image not available]")
+
+        elif isinstance(element, TableItem):
+            table_count += 1
+            if table_style == "inline":
+                df = element.export_to_dataframe(doc=doc)
+                parts.append(df.to_markdown())
+            else:
+                filename = f"table_{table_count}.png"
+                tbl_path = cache_path / filename
+                if _save_element_image(element, doc, tbl_path):
+                    figures[filename] = tbl_path
+                    parts.append(f"![Table {table_count}]({tbl_path})")
+                else:
+                    df = element.export_to_dataframe(doc=doc)
+                    parts.append(df.to_markdown())
+
+        elif isinstance(element, FormulaItem):
+            equation_count += 1
+            if equation_mode == "latex" and element.text:
+                parts.append(f"$${element.text}$$")
+            else:
+                filename = f"equation_{equation_count}.png"
+                eq_path = cache_path / filename
+                if _save_element_image(element, doc, eq_path):
+                    figures[filename] = eq_path
+                    parts.append(f"![Equation {equation_count}]({eq_path})")
+                elif element.text:
+                    parts.append(f"$${element.text}$$")
+                else:
+                    parts.append(f"[Equation {equation_count}: not available]")
+
+        elif isinstance(element, TextItem):
+            parts.append(element.text)
+
+    return parts, figures
+
+
 class DoclingConverter:
     """Convert PDFs using docling with figure, table, and equation extraction.
 
@@ -114,55 +189,13 @@ class DoclingConverter:
         cache_path = cache_dir_for(zotero_key, pdf_hash)
         cache_path.mkdir(parents=True, exist_ok=True)
 
-        parts: list[str] = []
-        figures: dict[str, Path] = {}
-        figure_count = 0
-        table_count = 0
-        equation_count = 0
-
-        for element, _level in doc.iterate_items():
-            if isinstance(element, PictureItem):
-                figure_count += 1
-                filename = f"figure_{figure_count}.png"
-                fig_path = cache_path / filename
-                if _save_element_image(element, doc, fig_path):
-                    figures[filename] = fig_path
-                    parts.append(f"![Figure {figure_count}]({fig_path})")
-                else:
-                    parts.append(f"[Figure {figure_count}: image not available]")
-
-            elif isinstance(element, TableItem):
-                table_count += 1
-                if table_style == "inline":
-                    df = element.export_to_dataframe(doc=doc)
-                    parts.append(df.to_markdown())
-                else:
-                    filename = f"table_{table_count}.png"
-                    tbl_path = cache_path / filename
-                    if _save_element_image(element, doc, tbl_path):
-                        figures[filename] = tbl_path
-                        parts.append(f"![Table {table_count}]({tbl_path})")
-                    else:
-                        df = element.export_to_dataframe(doc=doc)
-                        parts.append(df.to_markdown())
-
-            elif isinstance(element, FormulaItem):
-                equation_count += 1
-                if equation_mode == "latex" and element.text:
-                    parts.append(f"$${element.text}$$")
-                else:
-                    filename = f"equation_{equation_count}.png"
-                    eq_path = cache_path / filename
-                    if _save_element_image(element, doc, eq_path):
-                        figures[filename] = eq_path
-                        parts.append(f"![Equation {equation_count}]({eq_path})")
-                    elif element.text:
-                        parts.append(f"$${element.text}$$")
-                    else:
-                        parts.append(f"[Equation {equation_count}: not available]")
-
-            elif isinstance(element, TextItem):
-                parts.append(element.text)
+        parts, figures = _process_items(
+            doc.iterate_items(),
+            doc,
+            cache_path,
+            table_style=table_style,
+            equation_mode=equation_mode,
+        )
 
         markdown = "\n\n".join(parts)
 
