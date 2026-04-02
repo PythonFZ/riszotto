@@ -4,13 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
+from docling_core.types.doc import FormulaItem, PictureItem, TableItem
 
-docling = pytest.importorskip("docling")
-
-from docling_core.types.doc import FormulaItem, PictureItem, TableItem  # noqa: E402
-
-from riszotto.converter.docling import _process_items  # noqa: E402
+from riszotto.converter.docling import _process_items
 
 
 class TestProcessItemsEdgeCases:
