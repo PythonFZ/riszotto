@@ -15,13 +15,15 @@ Requires Zotero desktop to be running with the local API enabled.
 Requires [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```bash
-uvx riszotto --help
+uv tool install riszotto
+riszotto --help
 ```
 
 For semantic search:
 
 ```bash
-uvx --with "riszotto[semantic]" riszotto search --semantic "query"
+uv tool install "riszotto[semantic]"
+riszotto search --semantic "query"
 ```
 
 ## Usage
