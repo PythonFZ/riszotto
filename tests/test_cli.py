@@ -1033,6 +1033,67 @@ class TestExport:
         assert result.exit_code == 1
         assert "Unknown format" in result.output
 
+    @patch("riszotto.cli.get_item_bibtex")
+    @patch("riszotto.cli.get_client")
+    def test_export_multiple_keys(self, mock_get_client, mock_get_bibtex):
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_get_bibtex.side_effect = [
+            "@article{a, title={A}}",
+            "@article{b, title={B}}",
+            "@article{c, title={C}}",
+        ]
+
+        result = runner.invoke(app, ["export", "K1", "K2", "K3"])
+        assert result.exit_code == 0
+        assert "@article{a, title={A}}" in result.output
+        assert "@article{b, title={B}}" in result.output
+        assert "@article{c, title={C}}" in result.output
+        assert mock_get_bibtex.call_count == 3
+        called_keys = [call.args[1] for call in mock_get_bibtex.call_args_list]
+        assert called_keys == ["K1", "K2", "K3"]
+
+    @patch("riszotto.cli.get_item_bibtex")
+    @patch("riszotto.cli.get_client")
+    def test_export_multiple_keys_separated_by_blank_line(
+        self, mock_get_client, mock_get_bibtex
+    ):
+        mock_get_client.return_value = MagicMock()
+        mock_get_bibtex.side_effect = [
+            "@article{a, title={A}}\n",
+            "@article{b, title={B}}\n",
+        ]
+
+        result = runner.invoke(app, ["export", "K1", "K2"])
+        assert result.exit_code == 0
+        # Entries are separated by at least one blank line
+        assert "\n\n" in result.output
+
+    @patch("riszotto.cli.get_item_bibtex")
+    @patch("riszotto.cli.get_client")
+    def test_export_continues_on_key_error(self, mock_get_client, mock_get_bibtex):
+        mock_get_client.return_value = MagicMock()
+        mock_get_bibtex.side_effect = [
+            "@article{a, title={A}}",
+            RuntimeError("item not found"),
+            "@article{c, title={C}}",
+        ]
+
+        result = runner.invoke(app, ["export", "K1", "BAD", "K3"])
+        assert result.exit_code == 0
+        assert "@article{a, title={A}}" in result.output
+        assert "@article{c, title={C}}" in result.output
+        assert "BAD" in (result.stderr or result.output)
+
+    @patch("riszotto.cli.get_item_bibtex")
+    @patch("riszotto.cli.get_client")
+    def test_export_all_keys_fail_exits_nonzero(self, mock_get_client, mock_get_bibtex):
+        mock_get_client.return_value = MagicMock()
+        mock_get_bibtex.side_effect = RuntimeError("item not found")
+
+        result = runner.invoke(app, ["export", "BAD1", "BAD2"])
+        assert result.exit_code == 1
+
 
 class TestCollections:
     @patch("riszotto.cli.list_collections")
