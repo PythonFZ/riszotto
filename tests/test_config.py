@@ -2,6 +2,7 @@ import os
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from riszotto.config import Config, load_config
 
@@ -81,7 +82,7 @@ class TestConfig:
         config_file = tmp_path / "config.toml"
         config_file.write_text('[zotero]\nmode = "bogus"\n')
         with patch("riszotto.config.CONFIG_PATH", config_file):
-            with pytest.raises(Exception):  # pydantic ValidationError
+            with pytest.raises(ValidationError):
                 load_config()
 
     def test_old_env_vars_are_ignored(self, tmp_path):

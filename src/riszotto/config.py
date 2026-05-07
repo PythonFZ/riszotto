@@ -42,10 +42,10 @@ class _ZoteroTomlSource(PydanticBaseSettingsSource):
         super().__init__(settings_cls)
         self._toml_path = toml_path
 
-    def get_field_value(self, field, field_name):  # required override
-        data = self._load()
-        if field_name in data:
-            return data[field_name], field_name, False
+    def get_field_value(self, field, field_name):
+        # PydanticBaseSettingsSource requires this to be defined, but the framework
+        # only calls __call__ for this source. Returning a no-op tuple satisfies the
+        # ABC contract without creating a parallel resolution path.
         return None, field_name, False
 
     def __call__(self) -> dict[str, Any]:
