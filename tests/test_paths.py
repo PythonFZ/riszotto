@@ -19,3 +19,8 @@ class TestPaths:
 
         assert CONVERSION_CACHE_DIR.name == "conversions"
         assert "riszotto" in str(CONVERSION_CACHE_DIR)
+
+    def test_pdf_cache_dir_under_cache_dir(self):
+        from riszotto.paths import PDF_CACHE_DIR, cache_dir
+
+        assert PDF_CACHE_DIR == cache_dir() / "pdfs"

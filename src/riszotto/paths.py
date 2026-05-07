@@ -25,3 +25,4 @@ def cache_dir() -> Path:
 CONFIG_PATH = config_dir() / "config.toml"
 CHROMA_DIR = data_dir() / "chroma_db"
 CONVERSION_CACHE_DIR = cache_dir() / "conversions"
+PDF_CACHE_DIR = cache_dir() / "pdfs"
