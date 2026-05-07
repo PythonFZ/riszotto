@@ -9,24 +9,28 @@ from typing import Annotated, Optional
 
 import typer
 from pyzotero import zotero
-from pyzotero.zotero_errors import PyZoteroError
 
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
     AmbiguousLibraryError,
+    ConfigError,
     LibraryNotFoundError,
+    PdfNotOnStorageError,
+    ZoteroPermissionError,
     collection_items,
     get_client,
     get_item_bibtex,
     get_pdf_attachments,
-    get_pdf_path,
     list_collections,
     recent_items,
+    resolve_pdf_path,
     search_items,
 )
 from riszotto.config import load_config
+from riszotto.paths import CONFIG_PATH
 from riszotto.converter import get_converter
 from riszotto.converter.cache import clear_cache, get_cache_stats
+from riszotto.pdf_cache import clear_pdf_cache, pdf_cache_stats
 from riszotto.formatting import (
     format_creator,
     format_items_table,
@@ -70,6 +74,9 @@ def _get_zot(library: str | None = None) -> zotero.Zotero:
     try:
         return get_client(library=library)
     except (LibraryNotFoundError, AmbiguousLibraryError) as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    except ConfigError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1)
     except ConnectionError:
@@ -167,7 +174,7 @@ def _format_result(item: dict, max_value_size: int) -> dict:
 
 
 def _discover_libraries() -> list[dict]:
-    """Discover all accessible libraries and return metadata with clients.
+    """Discover all accessible libraries via the mode-resolved client.
 
     Returns
     -------
@@ -177,67 +184,57 @@ def _discover_libraries() -> list[dict]:
     """
     config = load_config()
     libs: list[dict] = []
-    seen_ids: set[int] = set()
 
     try:
-        local_zot = get_client()
-        libs.append(
-            {
-                "name": "My Library",
-                "id": "0",
-                "type": "user",
-                "source": "local",
-                "client": local_zot,
-            }
-        )
-        for group in local_zot.groups():
-            seen_ids.add(group["id"])
-            try:
+        zot = get_client()
+    except Exception:  # config error, local Zotero down with no remote, etc.
+        return libs
+
+    use_web = config.has_remote_credentials and config.mode != "local"
+    source = "remote" if use_web else "local"
+
+    libs.append(
+        {
+            "name": "My Library",
+            "id": "0",
+            "type": "user",
+            "source": source,
+            "client": zot,
+        }
+    )
+
+    try:
+        groups = zot.groups()
+    except Exception as e:
+        typer.echo(f"Warning: group discovery failed: {e}", err=True)
+        return libs
+
+    for group in groups:
+        try:
+            if use_web:
+                group_zot = zotero.Zotero(
+                    library_id=str(group["id"]),
+                    library_type="group",
+                    api_key=config.api_key,
+                )
+            else:
                 group_zot = zotero.Zotero(
                     library_id=str(group["id"]),
                     library_type="group",
                     local=True,
                 )
-                libs.append(
-                    {
-                        "name": group["data"]["name"],
-                        "id": str(group["id"]),
-                        "type": "group",
-                        "source": "local",
-                        "client": group_zot,
-                    }
-                )
-            except (ConnectionError, OSError, PyZoteroError):
-                pass
-    except (ConnectionError, OSError, PyZoteroError):
-        pass
-
-    if config.has_remote_credentials:
-        try:
-            remote = zotero.Zotero(
-                library_id=config.user_id,
-                library_type="user",
-                api_key=config.api_key,
-            )
-            for group in remote.groups():
-                if group["id"] not in seen_ids:
-                    group_zot = zotero.Zotero(
-                        library_id=str(group["id"]),
-                        library_type="group",
-                        api_key=config.api_key,
-                    )
-                    libs.append(
-                        {
-                            "name": group["data"]["name"],
-                            "id": str(group["id"]),
-                            "type": "group",
-                            "source": "remote",
-                            "client": group_zot,
-                            "meta_items": group.get("meta", {}).get("numItems", "?"),
-                        }
-                    )
-        except (ConnectionError, OSError, PyZoteroError) as e:
-            typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
+        except Exception:
+            continue
+        entry = {
+            "name": group["data"]["name"],
+            "id": str(group["id"]),
+            "type": "group",
+            "source": source,
+            "client": group_zot,
+        }
+        if use_web:
+            entry["meta_items"] = group.get("meta", {}).get("numItems", "?")
+        libs.append(entry)
 
     return libs
 
@@ -667,18 +664,18 @@ def show(
         raise typer.Exit(1)
 
     selected = pdfs[attachment - 1]
-    file_path = get_pdf_path(selected)
-    if not file_path:
-        if library:
-            typer.echo(
-                "PDF not available locally. The group is accessed via remote API "
-                "and show requires local files. Sync this group in Zotero desktop "
-                "for PDF access.",
-                err=True,
-            )
-        else:
-            typer.echo("Could not determine local file path for attachment.", err=True)
+    try:
+        resolved_path = resolve_pdf_path(zot, selected)
+    except PdfNotOnStorageError as e:
+        typer.echo(str(e), err=True)
         raise typer.Exit(1)
+    except ZoteroPermissionError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.echo(f"Failed to retrieve PDF: {e}", err=True)
+        raise typer.Exit(1)
+    file_path = str(resolved_path)
 
     try:
         converter = get_converter(backend)
@@ -998,7 +995,7 @@ def libraries() -> None:
         elif lib_info.get("client"):
             try:
                 entry["items"] = lib_info["client"].num_items()
-            except (ConnectionError, OSError, PyZoteroError):
+            except Exception:
                 entry["items"] = "?"
         else:
             entry["items"] = "?"
@@ -1035,6 +1032,38 @@ def libraries() -> None:
 
 # ── Cache command group ──────────────────────────────────────────────
 
+
+@app.command()
+def config() -> None:
+    """Show the resolved config path and the currently-loaded values.
+
+    The config file location follows OS conventions (platformdirs), so it is
+    not always ``~/.riszotto/config.toml``. Run ``riszotto config`` to see
+    where to place the file on this machine.
+    """
+    import os
+
+    cfg = load_config()
+    typer.echo(f"Config file: {CONFIG_PATH}")
+    typer.echo(
+        f"  Status: {'exists' if CONFIG_PATH.is_file() else 'not found (file is missing — env vars are the only source)'}"
+    )
+    typer.echo("")
+    typer.echo("Loaded values:")
+    typer.echo(f"  api_key: {'set' if cfg.api_key else 'unset'}")
+    typer.echo(f"  user_id: {cfg.user_id if cfg.user_id else 'unset'}")
+    typer.echo(f"  mode:    {cfg.mode}")
+    typer.echo("")
+    typer.echo("Environment variables (override the config file when set):")
+    for var in (
+        "RISZOTTO_ZOTERO_API_KEY",
+        "RISZOTTO_ZOTERO_USER_ID",
+        "RISZOTTO_ZOTERO_MODE",
+    ):
+        state = "set" if os.environ.get(var) else "not set"
+        typer.echo(f"  {var}: {state}")
+
+
 cache_app = typer.Typer(add_completion=False, help="Manage the conversion cache.")
 app.add_typer(cache_app, name="cache")
 
@@ -1056,18 +1085,26 @@ def cache_show(
     ] = None,
 ) -> None:
     """Show cache statistics."""
-    stats = get_cache_stats(key=key)
-    if key and stats["paper_count"] == 0:
+    md_stats = get_cache_stats(key=key)
+    if key and md_stats["paper_count"] == 0:
         typer.echo(f"No cached data for {key}.")
-        return
-    typer.echo(
-        f"Cache: {stats['paper_count']} paper(s), "
-        f"{_format_bytes(stats['total_bytes'])}. "
-        f"Path: {stats['path']}"
-    )
-    if stats.get("papers"):
-        for p in stats["papers"]:
-            typer.echo(f"  {p['key']}: {_format_bytes(p['bytes'])}")
+    else:
+        typer.echo(
+            f"Markdown cache: {md_stats['paper_count']} paper(s), "
+            f"{_format_bytes(md_stats['total_bytes'])}. "
+            f"Path: {md_stats['path']}"
+        )
+        if md_stats.get("papers"):
+            for p in md_stats["papers"]:
+                typer.echo(f"  {p['key']}: {_format_bytes(p['bytes'])}")
+
+    if key is None:
+        pdf_stats = pdf_cache_stats()
+        typer.echo(
+            f"PDF cache: {pdf_stats['count']} file(s), "
+            f"{_format_bytes(pdf_stats['total_bytes'])}. "
+            f"Path: {pdf_stats['path']}"
+        )
 
 
 def _parse_duration(s: str) -> int | None:
@@ -1081,7 +1118,9 @@ def _parse_duration(s: str) -> int | None:
 def cache_clear(
     key: Annotated[
         Optional[str],
-        typer.Option("--key", "-k", help="Clear cache for a specific paper"),
+        typer.Option(
+            "--key", "-k", help="Clear cache for a specific paper (markdown only)"
+        ),
     ] = None,
     older_than: Annotated[
         Optional[str],
@@ -1089,8 +1128,24 @@ def cache_clear(
             "--older-than", help="Clear entries older than duration (e.g., 30d)"
         ),
     ] = None,
+    only: Annotated[
+        Optional[str],
+        typer.Option(
+            "--only",
+            help="Restrict to one cache: 'conversions' or 'pdfs'",
+        ),
+    ] = None,
 ) -> None:
-    """Clear cached conversions."""
+    """Clear cached conversions and downloaded PDFs.
+
+    Without --only, both caches are cleared. ``--key`` only scopes the
+    markdown (conversions) cache; the PDF cache is content-keyed and not
+    associated with a specific Zotero key.
+    """
+    if only is not None and only not in ("conversions", "pdfs"):
+        typer.echo("Invalid --only value. Use 'conversions' or 'pdfs'.", err=True)
+        raise typer.Exit(1)
+
     older_than_days = None
     if older_than is not None:
         older_than_days = _parse_duration(older_than)
@@ -1101,5 +1156,21 @@ def cache_clear(
             )
             raise typer.Exit(1)
 
-    cleared = clear_cache(key=key, older_than_days=older_than_days)
-    typer.echo(f"Cleared {cleared} paper(s) from cache.")
+    if only in (None, "conversions"):
+        md_cleared = clear_cache(key=key, older_than_days=older_than_days)
+        typer.echo(f"Cleared {md_cleared} paper(s) from markdown cache.")
+
+    if only in (None, "pdfs"):
+        if key is not None and only is None:
+            # Default --key behavior: only conversions get scoped; PDF cache untouched.
+            pass
+        elif only == "pdfs" and key is not None:
+            typer.echo(
+                "--key has no effect on the PDF cache (content-keyed). "
+                "Run without --key to clear all cached PDFs.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        else:
+            pdf_cleared = clear_pdf_cache()
+            typer.echo(f"Cleared {pdf_cleared} file(s) from PDF cache.")

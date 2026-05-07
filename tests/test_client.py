@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
     AmbiguousLibraryError,
+    ConfigError,
     LibraryNotFoundError,
     _filter_bibtex_fields,
     collection_items,
@@ -22,15 +24,51 @@ from riszotto.config import Config
 
 
 class TestGetClient:
-    def test_returns_zotero_instance(self):
+    def _stub_config(self, monkeypatch, mode, api_key=None, user_id=None):
+        from riszotto.config import Config
+
+        monkeypatch.setattr(
+            "riszotto.client.load_config",
+            lambda: Config(api_key=api_key, user_id=user_id, mode=mode),
+        )
+
+    def test_auto_no_creds_returns_local(self, monkeypatch):
+        self._stub_config(monkeypatch, mode="auto")
         with patch("riszotto.client.zotero.Zotero") as mock_zotero:
             get_client()
             mock_zotero.assert_called_once_with(
-                library_id="0",
-                library_type="user",
-                api_key=None,
-                local=True,
+                library_id="0", library_type="user", api_key=None, local=True
             )
+
+    def test_auto_with_creds_returns_remote(self, monkeypatch):
+        self._stub_config(monkeypatch, mode="auto", api_key="k", user_id="123")
+        with patch("riszotto.client.zotero.Zotero") as mock_zotero:
+            get_client()
+            mock_zotero.assert_called_once_with(
+                library_id="123", library_type="user", api_key="k"
+            )
+
+    def test_local_forces_local_even_with_creds(self, monkeypatch):
+        self._stub_config(monkeypatch, mode="local", api_key="k", user_id="123")
+        with patch("riszotto.client.zotero.Zotero") as mock_zotero:
+            get_client()
+            mock_zotero.assert_called_once_with(
+                library_id="0", library_type="user", api_key=None, local=True
+            )
+
+    def test_web_with_creds_returns_remote(self, monkeypatch):
+        self._stub_config(monkeypatch, mode="web", api_key="k", user_id="123")
+        with patch("riszotto.client.zotero.Zotero") as mock_zotero:
+            get_client()
+            mock_zotero.assert_called_once_with(
+                library_id="123", library_type="user", api_key="k"
+            )
+
+    def test_web_without_creds_raises_config_error(self, monkeypatch):
+
+        self._stub_config(monkeypatch, mode="web")
+        with pytest.raises(ConfigError, match="api_key"):
+            get_client()
 
 
 class TestSearchItems:
@@ -455,8 +493,9 @@ class TestLibraryNotFoundError:
 
 
 class TestGetClientWithLibrary:
+    @patch("riszotto.client.load_config", return_value=Config())
     @patch("riszotto.client.zotero.Zotero")
-    def test_no_library_returns_local_user(self, mock_zotero):
+    def test_no_library_returns_local_user(self, mock_zotero, mock_load_config):
         get_client()
         mock_zotero.assert_called_once_with(
             library_id="0",
@@ -488,16 +527,13 @@ class TestGetClientWithLibrary:
         return_value=Config(api_key="k", user_id="u"),
     )
     @patch("riszotto.client.zotero.Zotero")
-    def test_library_fallback_to_remote(self, mock_zotero, mock_config):
-        mock_local = MagicMock()
-        mock_local.groups.side_effect = ConnectionError("refused")
-
+    def test_library_found_remote_when_creds_present(self, mock_zotero, mock_config):
         mock_remote = MagicMock()
         mock_remote.groups.return_value = [
             {"id": 999, "data": {"name": "Remote Group"}},
         ]
 
-        mock_zotero.side_effect = [mock_local, mock_remote, MagicMock()]
+        mock_zotero.side_effect = [mock_remote, MagicMock()]
 
         get_client(library="Remote Group")
 
@@ -509,12 +545,12 @@ class TestGetClientWithLibrary:
 
     @patch("riszotto.client.load_config", return_value=Config())
     @patch("riszotto.client.zotero.Zotero")
-    def test_library_not_found_no_remote_config(self, mock_zotero, mock_config):
+    def test_library_not_found_raises(self, mock_zotero, mock_config):
         mock_local = MagicMock()
         mock_local.groups.return_value = []
         mock_zotero.return_value = mock_local
 
-        with pytest.raises(LibraryNotFoundError, match="config"):
+        with pytest.raises(LibraryNotFoundError, match="Nonexistent"):
             get_client(library="Nonexistent")
 
     @patch(
@@ -522,16 +558,13 @@ class TestGetClientWithLibrary:
         return_value=Config(api_key="k", user_id="u"),
     )
     @patch("riszotto.client.zotero.Zotero")
-    def test_library_not_found_anywhere(self, mock_zotero, mock_config):
-        mock_local = MagicMock()
-        mock_local.groups.return_value = []
-
+    def test_library_not_found_shows_available(self, mock_zotero, mock_config):
         mock_remote = MagicMock()
         mock_remote.groups.return_value = [
             {"id": 1, "data": {"name": "Other Group"}},
         ]
 
-        mock_zotero.side_effect = [mock_local, mock_remote]
+        mock_zotero.return_value = mock_remote
 
         with pytest.raises(LibraryNotFoundError, match="Other Group"):
             get_client(library="Nonexistent")
@@ -548,3 +581,101 @@ class TestGetClientWithLibrary:
 
         with pytest.raises(AmbiguousLibraryError, match="multiple"):
             get_client(library="Lab")
+
+
+class TestResolvePdfPath:
+    def _attachment(
+        self,
+        *,
+        md5="abc123",
+        filename="paper.pdf",
+        enclosure_href=None,
+    ):
+        att = {
+            "key": "ITEMKEY1",
+            "data": {"md5": md5, "filename": filename},
+        }
+        if enclosure_href is not None:
+            att["links"] = {"enclosure": {"href": enclosure_href}}
+        return att
+
+    def test_returns_local_path_when_enclosure_exists(self, tmp_path):
+        from riszotto.client import resolve_pdf_path
+
+        local = tmp_path / "paper.pdf"
+        local.write_bytes(b"%PDF-1.4")
+        zot = MagicMock()
+
+        result = resolve_pdf_path(
+            zot, self._attachment(enclosure_href=f"file://{local}")
+        )
+        assert result == local
+        zot.dump.assert_not_called()
+
+    def test_falls_through_when_enclosure_path_missing(self, tmp_path):
+        from riszotto.client import resolve_pdf_path
+
+        zot = MagicMock()
+
+        def fake_dump(item_key, filename, path):
+            Path(path, filename).write_bytes(b"%PDF-1.4")
+            return str(Path(path, filename))
+
+        zot.dump.side_effect = fake_dump
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            result = resolve_pdf_path(
+                zot,
+                self._attachment(enclosure_href="file:///nonexistent/missing.pdf"),
+            )
+        assert result == tmp_path / "abc123.pdf"
+        zot.dump.assert_called_once()
+
+    def test_uses_pdf_cache_on_hit(self, tmp_path):
+        from riszotto.client import resolve_pdf_path
+
+        cached = tmp_path / "abc123.pdf"
+        cached.write_bytes(b"%PDF-1.4")
+        zot = MagicMock()
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            result = resolve_pdf_path(zot, self._attachment())
+        assert result == cached
+        zot.dump.assert_not_called()
+
+    def test_md5_none_raises_pdf_not_on_storage(self, tmp_path):
+        from riszotto.client import PdfNotOnStorageError, resolve_pdf_path
+
+        zot = MagicMock()
+        att = self._attachment(md5=None)
+        att["data"]["url"] = "https://example.com/paper.pdf"
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            with pytest.raises(PdfNotOnStorageError) as exc_info:
+                resolve_pdf_path(zot, att)
+        assert "ITEMKEY1" in str(exc_info.value)
+        assert "https://example.com/paper.pdf" in str(exc_info.value)
+
+    def test_dump_404_raises_pdf_not_on_storage(self, tmp_path):
+        from pyzotero.zotero_errors import ResourceNotFoundError
+
+        from riszotto.client import PdfNotOnStorageError, resolve_pdf_path
+
+        zot = MagicMock()
+        zot.dump.side_effect = ResourceNotFoundError("Not found")
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            with pytest.raises(PdfNotOnStorageError):
+                resolve_pdf_path(zot, self._attachment())
+
+    def test_dump_403_raises_zotero_permission_error(self, tmp_path):
+        from pyzotero.zotero_errors import UserNotAuthorisedError
+
+        from riszotto.client import ZoteroPermissionError, resolve_pdf_path
+
+        zot = MagicMock()
+        zot.dump.side_effect = UserNotAuthorisedError("forbidden")
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            with pytest.raises(ZoteroPermissionError):
+                resolve_pdf_path(zot, self._attachment())

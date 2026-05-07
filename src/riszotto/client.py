@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
 from pyzotero import zotero
-from pyzotero.zotero_errors import PyZoteroError
+from pyzotero.zotero_errors import ResourceNotFoundError, UserNotAuthorisedError
 
 from riszotto.config import load_config
 from riszotto.formatting import CHILD_ITEM_TYPES
@@ -28,6 +29,37 @@ class LibraryNotFoundError(Exception):
 
 class AmbiguousLibraryError(Exception):
     """Raised when a library name matches multiple groups."""
+
+
+class ConfigError(Exception):
+    """Raised when configuration is incomplete or invalid for the requested mode."""
+
+
+class PdfNotOnStorageError(Exception):
+    """Raised when an attachment's PDF cannot be retrieved via the web API.
+
+    Either ``data.md5`` is ``None`` (file never uploaded to Zotero storage)
+    or the storage download returns 404 (deleted or quota-exceeded).
+    """
+
+    def __init__(self, attachment_key: str, source_url: str | None = None):
+        self.attachment_key = attachment_key
+        self.source_url = source_url
+        msg = (
+            f"PDF for {attachment_key} is not on Zotero storage "
+            "(file sync disabled or metadata-only attachment)."
+        )
+        if source_url:
+            msg += f" Source URL: {source_url}."
+        msg += (
+            ' Run riszotto with `mode = "local"` and Zotero desktop running, '
+            "or enable file sync in Zotero preferences."
+        )
+        super().__init__(msg)
+
+
+class ZoteroPermissionError(Exception):
+    """Raised when the API key lacks permission to download a file."""
 
 
 def find_group(groups: list[dict[str, Any]], library: str) -> dict[str, Any] | None:
@@ -88,6 +120,12 @@ def find_group(groups: list[dict[str, Any]], library: str) -> dict[str, Any] | N
 def get_client(library: str | None = None) -> zotero.Zotero:
     """Create a pyzotero client, optionally targeting a group library.
 
+    Selection is driven by ``config.mode``:
+
+    - ``"local"``: always local (port 23119).
+    - ``"web"``: always remote; raises ``ConfigError`` if creds missing.
+    - ``"auto"`` (default): remote when creds present, else local.
+
     Parameters
     ----------
     library : str or None
@@ -100,59 +138,70 @@ def get_client(library: str | None = None) -> zotero.Zotero:
 
     Raises
     ------
+    ConfigError
+        If ``mode="web"`` and credentials are not configured.
     LibraryNotFoundError
-        If the requested group cannot be found locally or remotely.
+        If the requested group cannot be found in the resolved client.
     AmbiguousLibraryError
         If the name matches multiple groups.
     """
-    if library is None:
-        return zotero.Zotero(
-            library_id="0",
-            library_type="user",
-            api_key=None,
-            local=True,
-        )
-
     config = load_config()
+    use_web = _resolve_use_web(config)
 
-    # Try local first
-    local_client = zotero.Zotero(library_id="0", library_type="user", local=True)
-    try:
-        local_groups = local_client.groups()
-        match = find_group(local_groups, library)
-        if match:
-            return zotero.Zotero(
-                library_id=str(match["id"]),
-                library_type="group",
-                local=True,
-            )
-    except (ConnectionError, OSError, PyZoteroError):
-        pass  # local API not available
+    if library is None:
+        return _make_personal_client(config, use_web)
 
-    # Fall back to remote
-    if not config.has_remote_credentials:
+    base = _make_personal_client(config, use_web)
+    groups = base.groups()
+    match = find_group(groups, library)
+    if match is None:
+        available = [g["data"]["name"] for g in groups]
         raise LibraryNotFoundError(
-            f"Group '{library}' not found locally. "
-            "Configure api_key and user_id in ~/.riszotto/config.toml "
-            "for remote access."
+            f"Group '{library}' not found. Available: {available}"
         )
 
-    remote_client = zotero.Zotero(
-        library_id=config.user_id,
-        library_type="user",
-        api_key=config.api_key,
-    )
-    remote_groups = remote_client.groups()
-    match = find_group(remote_groups, library)
-    if match:
+    if use_web:
         return zotero.Zotero(
             library_id=str(match["id"]),
             library_type="group",
             api_key=config.api_key,
         )
+    return zotero.Zotero(
+        library_id=str(match["id"]),
+        library_type="group",
+        local=True,
+    )
 
-    available = [g["data"]["name"] for g in remote_groups]
-    raise LibraryNotFoundError(f"Group '{library}' not found. Available: {available}")
+
+def _resolve_use_web(config) -> bool:
+    """Return True if the resolved mode wants the web API."""
+    if config.mode == "local":
+        return False
+    if config.mode == "web":
+        if not config.has_remote_credentials:
+            raise ConfigError(
+                "Web mode requires `api_key` and `user_id`. "
+                "Configure in ~/.riszotto/config.toml [zotero] or set "
+                "RISZOTTO_ZOTERO_API_KEY and RISZOTTO_ZOTERO_USER_ID."
+            )
+        return True
+    # auto
+    return config.has_remote_credentials
+
+
+def _make_personal_client(config, use_web: bool) -> zotero.Zotero:
+    if use_web:
+        return zotero.Zotero(
+            library_id=config.user_id,
+            library_type="user",
+            api_key=config.api_key,
+        )
+    return zotero.Zotero(
+        library_id="0",
+        library_type="user",
+        api_key=None,
+        local=True,
+    )
 
 
 def search_items(
@@ -306,3 +355,60 @@ def get_pdf_path(attachment: dict[str, Any]) -> str | None:
     if parsed.scheme == "file":
         return unquote(parsed.path)
     return None
+
+
+def resolve_pdf_path(zot: zotero.Zotero, attachment: dict[str, Any]) -> Path:
+    """Return a local Path to the attachment's PDF, downloading if needed.
+
+    Resolution order:
+
+    1. If the attachment's ``links.enclosure`` is a ``file://`` URL pointing at
+       an existing file (local Zotero), return it.
+    2. Otherwise consult the on-disk PDF cache; download via ``zot.dump`` on miss.
+
+    Parameters
+    ----------
+    zot : zotero.Zotero
+        A configured pyzotero client.
+    attachment : dict[str, Any]
+        A Zotero attachment item dict.
+
+    Returns
+    -------
+    Path
+        Local path to the PDF file.
+
+    Raises
+    ------
+    PdfNotOnStorageError
+        If ``attachment.data.md5`` is missing or the download returns 404.
+    ZoteroPermissionError
+        If the API key lacks file-read permission for the library.
+    """
+    from riszotto.pdf_cache import download_to_pdf_cache  # local import: avoid cycle
+
+    local = get_pdf_path(attachment)
+    if local:
+        local_path = Path(local)
+        if local_path.is_file():
+            return local_path
+
+    md5 = attachment.get("data", {}).get("md5")
+    if not md5:
+        raise PdfNotOnStorageError(
+            attachment_key=attachment.get("key", "<unknown>"),
+            source_url=attachment.get("data", {}).get("url"),
+        )
+
+    try:
+        return download_to_pdf_cache(zot, attachment)
+    except ResourceNotFoundError:
+        raise PdfNotOnStorageError(
+            attachment_key=attachment.get("key", "<unknown>"),
+            source_url=attachment.get("data", {}).get("url"),
+        )
+    except UserNotAuthorisedError as e:
+        raise ZoteroPermissionError(
+            "API key lacks file-read permission for this library. "
+            "Update key permissions at zotero.org/settings/keys."
+        ) from e

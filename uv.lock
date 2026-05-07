@@ -3068,6 +3068,7 @@ dependencies = [
     { name = "markitdown", extra = ["pdf"] },
     { name = "platformdirs" },
     { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "pyzotero" },
     { name = "typer" },
 ]
@@ -3098,6 +3099,7 @@ requires-dist = [
     { name = "markitdown", extras = ["pdf"], specifier = ">=0.1.0" },
     { name = "platformdirs", specifier = ">=4.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "pyzotero", specifier = ">=1.5.0" },
     { name = "sentence-transformers", marker = "extra == 'full'", specifier = ">=2.2.0" },
     { name = "sentence-transformers", marker = "extra == 'semantic'", specifier = ">=2.2.0" },

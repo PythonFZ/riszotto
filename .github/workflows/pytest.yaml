@@ -22,4 +22,12 @@ jobs:
         run: uv sync --extra full
 
       - name: Run tests
+        env:
+          # Empty for fork PRs (GitHub doesn't expose secrets to forks);
+          # integration tests skip themselves cleanly when these are unset.
+          RISZOTTO_ZOTERO_API_KEY: ${{ secrets.RISZOTTO_ZOTERO_API_KEY }}
+          RISZOTTO_ZOTERO_USER_ID: ${{ secrets.RISZOTTO_ZOTERO_USER_ID }}
+          RISZOTTO_TEST_GROUP_ID: ${{ secrets.RISZOTTO_TEST_GROUP_ID }}
+          RISZOTTO_TEST_GROUP_ITEM_KEY: ${{ secrets.RISZOTTO_TEST_GROUP_ITEM_KEY }}
+          RISZOTTO_TEST_PERSONAL_ITEM_KEY: ${{ secrets.RISZOTTO_TEST_PERSONAL_ITEM_KEY }}
         run: uv run pytest

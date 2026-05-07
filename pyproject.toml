@@ -12,6 +12,7 @@ dependencies = [
     "markitdown[pdf]>=0.1.0",
     "pydantic>=2.0.0",
     "platformdirs>=4.0.0",
+    "pydantic-settings>=2.13.1",
 ]
 
 [project.scripts]
@@ -44,4 +45,9 @@ version-file = "src/riszotto/_version.py"
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests that hit api.zotero.org; skipif decorator on the tests skips them when RISZOTTO_ZOTERO_* env vars are absent",
 ]

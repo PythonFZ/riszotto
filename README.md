@@ -69,13 +69,48 @@ riszotto index -L "My Group"
 
 All commands support `--library` / `-L` to target a group library by name or ID. Without it, commands default to the personal library.
 
-For groups not synced locally, configure `~/.riszotto/config.toml` for remote API access:
+## Configuration
+
+The config file path follows OS conventions (via `platformdirs`). Run
+`riszotto config` to print the resolved path and the currently-loaded
+values on your machine. Typical locations:
+
+| OS | Path |
+|----|------|
+| macOS | `~/Library/Application Support/riszotto/config.toml` |
+| Linux | `$XDG_CONFIG_HOME/riszotto/config.toml` (defaults to `~/.config/riszotto/config.toml`) |
+| Windows | `%APPDATA%\riszotto\config.toml` |
+
+Contents:
 
 ```toml
 [zotero]
 api_key = "..."   # from zotero.org/settings/keys
-user_id = "..."   # from zotero.org/settings/keys
+user_id = "..."   # numeric user ID
+mode = "auto"     # "auto" (default) | "local" | "web"
 ```
+
+Mode resolution:
+
+| `mode` | creds set | result |
+|--------|-----------|--------|
+| `auto` (default) | yes | use the Zotero Web API |
+| `auto` | no | use the local Zotero desktop |
+| `local` | — | always local |
+| `web` | yes | always web |
+| `web` | no | error: web mode requires creds |
+
+Environment variables (override the TOML file):
+
+- `RISZOTTO_ZOTERO_API_KEY`
+- `RISZOTTO_ZOTERO_USER_ID`
+- `RISZOTTO_ZOTERO_MODE`
+
+In web mode, `show` downloads attachment PDFs into a content-addressed
+cache (path varies by OS — see `riszotto cache show`) under `pdfs/{md5}.pdf`,
+deduplicated across libraries. The PDF must be on Zotero storage —
+attachments with `md5 = null` (file sync disabled, metadata-only
+attachments) cannot be retrieved over the web API.
 
 ## Claude Code Skill
 
