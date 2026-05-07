@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -581,3 +582,101 @@ class TestGetClientWithLibrary:
 
         with pytest.raises(AmbiguousLibraryError, match="multiple"):
             get_client(library="Lab")
+
+
+class TestResolvePdfPath:
+    def _attachment(
+        self,
+        *,
+        md5="abc123",
+        filename="paper.pdf",
+        enclosure_href=None,
+    ):
+        att = {
+            "key": "ITEMKEY1",
+            "data": {"md5": md5, "filename": filename},
+        }
+        if enclosure_href is not None:
+            att["links"] = {"enclosure": {"href": enclosure_href}}
+        return att
+
+    def test_returns_local_path_when_enclosure_exists(self, tmp_path):
+        from riszotto.client import resolve_pdf_path
+
+        local = tmp_path / "paper.pdf"
+        local.write_bytes(b"%PDF-1.4")
+        zot = MagicMock()
+
+        result = resolve_pdf_path(
+            zot, self._attachment(enclosure_href=f"file://{local}")
+        )
+        assert result == local
+        zot.dump.assert_not_called()
+
+    def test_falls_through_when_enclosure_path_missing(self, tmp_path):
+        from riszotto.client import resolve_pdf_path
+
+        zot = MagicMock()
+
+        def fake_dump(item_key, filename, path):
+            Path(path, filename).write_bytes(b"%PDF-1.4")
+            return str(Path(path, filename))
+
+        zot.dump.side_effect = fake_dump
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            result = resolve_pdf_path(
+                zot,
+                self._attachment(enclosure_href="file:///nonexistent/missing.pdf"),
+            )
+        assert result == tmp_path / "abc123.pdf"
+        zot.dump.assert_called_once()
+
+    def test_uses_pdf_cache_on_hit(self, tmp_path):
+        from riszotto.client import resolve_pdf_path
+
+        cached = tmp_path / "abc123.pdf"
+        cached.write_bytes(b"%PDF-1.4")
+        zot = MagicMock()
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            result = resolve_pdf_path(zot, self._attachment())
+        assert result == cached
+        zot.dump.assert_not_called()
+
+    def test_md5_none_raises_pdf_not_on_storage(self, tmp_path):
+        from riszotto.client import PdfNotOnStorageError, resolve_pdf_path
+
+        zot = MagicMock()
+        att = self._attachment(md5=None)
+        att["data"]["url"] = "https://example.com/paper.pdf"
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            with pytest.raises(PdfNotOnStorageError) as exc_info:
+                resolve_pdf_path(zot, att)
+        assert "ITEMKEY1" in str(exc_info.value)
+        assert "https://example.com/paper.pdf" in str(exc_info.value)
+
+    def test_dump_404_raises_pdf_not_on_storage(self, tmp_path):
+        from pyzotero.zotero_errors import ResourceNotFoundError
+
+        from riszotto.client import PdfNotOnStorageError, resolve_pdf_path
+
+        zot = MagicMock()
+        zot.dump.side_effect = ResourceNotFoundError("Not found")
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            with pytest.raises(PdfNotOnStorageError):
+                resolve_pdf_path(zot, self._attachment())
+
+    def test_dump_403_raises_zotero_permission_error(self, tmp_path):
+        from pyzotero.zotero_errors import UserNotAuthorisedError
+
+        from riszotto.client import ZoteroPermissionError, resolve_pdf_path
+
+        zot = MagicMock()
+        zot.dump.side_effect = UserNotAuthorisedError("forbidden")
+
+        with patch("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path):
+            with pytest.raises(ZoteroPermissionError):
+                resolve_pdf_path(zot, self._attachment())

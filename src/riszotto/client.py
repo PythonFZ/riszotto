@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
 from pyzotero import zotero
+from pyzotero.zotero_errors import ResourceNotFoundError, UserNotAuthorisedError
 
 from riszotto.config import load_config
 from riszotto.formatting import CHILD_ITEM_TYPES
@@ -31,6 +33,33 @@ class AmbiguousLibraryError(Exception):
 
 class ConfigError(Exception):
     """Raised when configuration is incomplete or invalid for the requested mode."""
+
+
+class PdfNotOnStorageError(Exception):
+    """Raised when an attachment's PDF cannot be retrieved via the web API.
+
+    Either ``data.md5`` is ``None`` (file never uploaded to Zotero storage)
+    or the storage download returns 404 (deleted or quota-exceeded).
+    """
+
+    def __init__(self, attachment_key: str, source_url: str | None = None):
+        self.attachment_key = attachment_key
+        self.source_url = source_url
+        msg = (
+            f"PDF for {attachment_key} is not on Zotero storage "
+            "(file sync disabled or metadata-only attachment)."
+        )
+        if source_url:
+            msg += f" Source URL: {source_url}."
+        msg += (
+            " Run riszotto with `mode = \"local\"` and Zotero desktop running, "
+            "or enable file sync in Zotero preferences."
+        )
+        super().__init__(msg)
+
+
+class ZoteroPermissionError(Exception):
+    """Raised when the API key lacks permission to download a file."""
 
 
 def find_group(groups: list[dict[str, Any]], library: str) -> dict[str, Any] | None:
@@ -326,3 +355,60 @@ def get_pdf_path(attachment: dict[str, Any]) -> str | None:
     if parsed.scheme == "file":
         return unquote(parsed.path)
     return None
+
+
+def resolve_pdf_path(zot: zotero.Zotero, attachment: dict[str, Any]) -> Path:
+    """Return a local Path to the attachment's PDF, downloading if needed.
+
+    Resolution order:
+
+    1. If the attachment's ``links.enclosure`` is a ``file://`` URL pointing at
+       an existing file (local Zotero), return it.
+    2. Otherwise consult the on-disk PDF cache; download via ``zot.dump`` on miss.
+
+    Parameters
+    ----------
+    zot : zotero.Zotero
+        A configured pyzotero client.
+    attachment : dict[str, Any]
+        A Zotero attachment item dict.
+
+    Returns
+    -------
+    Path
+        Local path to the PDF file.
+
+    Raises
+    ------
+    PdfNotOnStorageError
+        If ``attachment.data.md5`` is missing or the download returns 404.
+    ZoteroPermissionError
+        If the API key lacks file-read permission for the library.
+    """
+    from riszotto.pdf_cache import download_to_pdf_cache  # local import: avoid cycle
+
+    local = get_pdf_path(attachment)
+    if local:
+        local_path = Path(local)
+        if local_path.is_file():
+            return local_path
+
+    md5 = attachment.get("data", {}).get("md5")
+    if not md5:
+        raise PdfNotOnStorageError(
+            attachment_key=attachment.get("key", "<unknown>"),
+            source_url=attachment.get("data", {}).get("url"),
+        )
+
+    try:
+        return download_to_pdf_cache(zot, attachment)
+    except ResourceNotFoundError:
+        raise PdfNotOnStorageError(
+            attachment_key=attachment.get("key", "<unknown>"),
+            source_url=attachment.get("data", {}).get("url"),
+        )
+    except UserNotAuthorisedError as e:
+        raise ZoteroPermissionError(
+            "API key lacks file-read permission for this library. "
+            "Update key permissions at zotero.org/settings/keys."
+        ) from e
