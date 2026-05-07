@@ -197,7 +197,7 @@ The `show` command itself takes no new flags. Mode is config-only.
 - **Old "personal=local, groups=web-fallback" hybrid is removed.** Users who specifically want the personal library to stay local while groups use the web API have two options:
   - Leave `mode="auto"` and run Zotero locally — `auto` picks local when no creds reach it; if creds *are* set, web takes over uniformly (the new behavior).
   - Set `mode="local"` to force local everywhere; group lookups will then fail when the group is not synced locally, which matches the pre-groups-feature state.
-  
+
   The collapsed rule is strictly simpler and the new default (`auto` + creds → web everywhere) is strictly more capable than the old hybrid for users with file sync enabled.
 
 ## Risks

@@ -65,7 +65,6 @@ class TestGetClient:
             )
 
     def test_web_without_creds_raises_config_error(self, monkeypatch):
-        from riszotto.client import ConfigError
 
         self._stub_config(monkeypatch, mode="web")
         with pytest.raises(ConfigError, match="api_key"):

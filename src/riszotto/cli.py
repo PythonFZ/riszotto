@@ -1096,7 +1096,9 @@ def _parse_duration(s: str) -> int | None:
 def cache_clear(
     key: Annotated[
         Optional[str],
-        typer.Option("--key", "-k", help="Clear cache for a specific paper (markdown only)"),
+        typer.Option(
+            "--key", "-k", help="Clear cache for a specific paper (markdown only)"
+        ),
     ] = None,
     older_than: Annotated[
         Optional[str],

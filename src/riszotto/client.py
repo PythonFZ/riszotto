@@ -52,7 +52,7 @@ class PdfNotOnStorageError(Exception):
         if source_url:
             msg += f" Source URL: {source_url}."
         msg += (
-            " Run riszotto with `mode = \"local\"` and Zotero desktop running, "
+            ' Run riszotto with `mode = "local"` and Zotero desktop running, '
             "or enable file sync in Zotero preferences."
         )
         super().__init__(msg)
