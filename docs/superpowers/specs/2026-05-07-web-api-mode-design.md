@@ -193,7 +193,7 @@ The `show` command itself takes no new flags. Mode is config-only.
 
 - **No `[zotero]` section configured:** behavior identical to today. `mode="auto"` + no creds → local-only.
 - **Creds configured, no `mode` field:** defaults to `mode="auto"`. **Behavior change:** the personal library now uses the web API instead of falling back to local. Documented in `CHANGELOG.md` and the README.
-- **Env var rename (breaking):** `ZOTERO_API_KEY` → `RISZOTTO_ZOTERO_API_KEY`, `ZOTERO_USER_ID` → `RISZOTTO_ZOTERO_USER_ID`. Old names are no longer read. Documented in `CHANGELOG.md` and the README. Migration is one-line shell change for affected users; TOML config is unchanged.
+- **Env var rename (breaking):** `ZOTERO_API_KEY` → `RISZOTTO_ZOTERO_API_KEY`, `ZOTERO_USER_ID` → `RISZOTTO_ZOTERO_USER_ID`. Old names are no longer read. **No migration script, no compatibility shim, no deprecation warning** — clean rename. Affected users update their shell config (one-line change); TOML config is unchanged. Documented in `CHANGELOG.md` and the README only.
 - **Old "personal=local, groups=web-fallback" hybrid is removed.** Users who specifically want the personal library to stay local while groups use the web API have two options:
   - Leave `mode="auto"` and run Zotero locally — `auto` picks local when no creds reach it; if creds *are* set, web takes over uniformly (the new behavior).
   - Set `mode="local"` to force local everywhere; group lookups will then fail when the group is not synced locally, which matches the pre-groups-feature state.
