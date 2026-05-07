@@ -15,13 +15,15 @@ from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
     AmbiguousLibraryError,
     LibraryNotFoundError,
+    PdfNotOnStorageError,
+    ZoteroPermissionError,
     collection_items,
     get_client,
     get_item_bibtex,
     get_pdf_attachments,
-    get_pdf_path,
     list_collections,
     recent_items,
+    resolve_pdf_path,
     search_items,
 )
 from riszotto.config import load_config
@@ -667,18 +669,15 @@ def show(
         raise typer.Exit(1)
 
     selected = pdfs[attachment - 1]
-    file_path = get_pdf_path(selected)
-    if not file_path:
-        if library:
-            typer.echo(
-                "PDF not available locally. The group is accessed via remote API "
-                "and show requires local files. Sync this group in Zotero desktop "
-                "for PDF access.",
-                err=True,
-            )
-        else:
-            typer.echo("Could not determine local file path for attachment.", err=True)
+    try:
+        resolved_path = resolve_pdf_path(zot, selected)
+    except PdfNotOnStorageError as e:
+        typer.echo(str(e), err=True)
         raise typer.Exit(1)
+    except ZoteroPermissionError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    file_path = str(resolved_path)
 
     try:
         converter = get_converter(backend)

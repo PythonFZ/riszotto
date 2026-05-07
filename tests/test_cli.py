@@ -493,9 +493,10 @@ class TestConnectionError:
 
 
 class TestShow:
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_converts_pdf(self, mock_get_client, mock_get_converter):
+    def test_show_converts_pdf(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -537,9 +538,10 @@ class TestShow:
         assert result.exit_code == 1
         assert "No PDF attachment" in result.output
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_attachment_flag(self, mock_get_client, mock_get_converter):
+    def test_show_attachment_flag(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -574,9 +576,10 @@ class TestShow:
         assert result.exit_code == 0
         mock_converter.convert.assert_called_once()
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_page_default_paginates(self, mock_get_client, mock_get_converter):
+    def test_show_page_default_paginates(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -606,9 +609,10 @@ class TestShow:
         assert "Line 6" not in result.output
         assert "Page 1/2" in result.output
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_page_2(self, mock_get_client, mock_get_converter):
+    def test_show_page_2(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -638,9 +642,10 @@ class TestShow:
         assert "Line 10" in result.output
         assert "Line 5" not in result.output
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_page_zero_dumps_all(self, mock_get_client, mock_get_converter):
+    def test_show_page_zero_dumps_all(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -669,9 +674,10 @@ class TestShow:
         assert "Line 1" in result.output
         assert "Line 10" in result.output
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_page_out_of_range(self, mock_get_client, mock_get_converter):
+    def test_show_page_out_of_range(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -697,9 +703,10 @@ class TestShow:
         assert result.exit_code == 1
         assert "out of range" in result.output.lower()
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_search_finds_lines(self, mock_get_client, mock_get_converter):
+    def test_show_search_finds_lines(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -734,9 +741,10 @@ class TestShow:
         assert "filler line 20" in result.output  # 1 line after
         assert "filler line 0" not in result.output  # far away
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_search_no_match(self, mock_get_client, mock_get_converter):
+    def test_show_search_no_match(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -762,9 +770,10 @@ class TestShow:
         assert result.exit_code == 0
         assert "No lines matching" in result.output
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_search_multiple_terms(self, mock_get_client, mock_get_converter):
+    def test_show_search_multiple_terms(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -804,9 +813,10 @@ class TestShow:
         assert "We used DFT calculations." not in result.output
         assert "BMIM showed interesting properties." not in result.output
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_search_case_insensitive(self, mock_get_client, mock_get_converter):
+    def test_show_search_case_insensitive(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -832,10 +842,11 @@ class TestShow:
         assert result.exit_code == 0
         assert "Machine Learning is great." in result.output
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
     def test_show_search_separator_between_blocks(
-        self, mock_get_client, mock_get_converter
+        self, mock_get_client, mock_get_converter, mock_resolve_pdf_path
     ):
         from riszotto.converter.base import ConversionResult
 
@@ -869,9 +880,10 @@ class TestShow:
 class TestShowConverterIntegration:
     """Tests for the converter-backed show command."""
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_uses_converter(self, mock_get_client, mock_get_converter):
+    def test_show_uses_converter(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -898,9 +910,10 @@ class TestShowConverterIntegration:
         assert "# Converted" in result.output
         mock_converter.convert.assert_called_once()
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_backend_flag(self, mock_get_client, mock_get_converter):
+    def test_show_backend_flag(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -923,10 +936,11 @@ class TestShowConverterIntegration:
         runner.invoke(app, ["show", "--backend", "markitdown", "PARENT1"])
         mock_get_converter.assert_called_with("markitdown")
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
     def test_show_style_flags_passed_to_converter(
-        self, mock_get_client, mock_get_converter
+        self, mock_get_client, mock_get_converter, mock_resolve_pdf_path
     ):
         from riszotto.converter.base import ConversionResult
 
@@ -955,9 +969,10 @@ class TestShowConverterIntegration:
         assert call_kwargs["table_style"] == "image"
         assert call_kwargs["equation_style"] == "image"
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_no_cache_flag(self, mock_get_client, mock_get_converter):
+    def test_show_no_cache_flag(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -2015,9 +2030,10 @@ class TestCacheCommands:
 
 
 class TestShowNewFlags:
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_ocr_flag(self, mock_get_client, mock_get_converter):
+    def test_show_ocr_flag(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -2041,9 +2057,10 @@ class TestShowNewFlags:
         call_kwargs = mock_converter.convert.call_args[1]
         assert call_kwargs["ocr"] is True
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_ocr_default_off(self, mock_get_client, mock_get_converter):
+    def test_show_ocr_default_off(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -2067,9 +2084,10 @@ class TestShowNewFlags:
         call_kwargs = mock_converter.convert.call_args[1]
         assert call_kwargs["ocr"] is False
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_table_mode_flag(self, mock_get_client, mock_get_converter):
+    def test_show_table_mode_flag(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -2093,9 +2111,10 @@ class TestShowNewFlags:
         call_kwargs = mock_converter.convert.call_args[1]
         assert call_kwargs["table_mode"] == "accurate"
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_equations_flag(self, mock_get_client, mock_get_converter):
+    def test_show_equations_flag(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -2119,9 +2138,10 @@ class TestShowNewFlags:
         call_kwargs = mock_converter.convert.call_args[1]
         assert call_kwargs["equation_mode"] == "latex"
 
+    @patch("riszotto.cli.resolve_pdf_path")
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_empty_output_warns(self, mock_get_client, mock_get_converter):
+    def test_show_empty_output_warns(self, mock_get_client, mock_get_converter, mock_resolve_pdf_path):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
@@ -2153,3 +2173,56 @@ class TestShowNewFlags:
         result = runner.invoke(app, ["show", "--equations", "bogus", "P1"])
         assert result.exit_code == 1
         assert "Invalid --equations" in result.output
+
+
+class TestShowResolvePdfPathErrors:
+    def test_pdf_not_on_storage_surfaces_to_stderr(self, monkeypatch, capsys):
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+        from riszotto.client import PdfNotOnStorageError
+
+        runner = CliRunner()
+
+        zot = MagicMock()
+        monkeypatch.setattr("riszotto.cli.get_client", lambda library=None: zot)
+        monkeypatch.setattr(
+            "riszotto.cli.get_pdf_attachments",
+            lambda zot, key: [{"key": "A", "data": {"md5": None}}],
+        )
+
+        def boom(zot, attachment):
+            raise PdfNotOnStorageError(
+                attachment_key="A", source_url="https://x/y.pdf"
+            )
+
+        monkeypatch.setattr("riszotto.cli.resolve_pdf_path", boom)
+
+        result = runner.invoke(app, ["show", "ITEMKEY1"])
+        assert result.exit_code == 1
+        assert "not on Zotero storage" in result.output
+        assert "https://x/y.pdf" in result.output
+
+    def test_zotero_permission_error_surfaces_to_stderr(self, monkeypatch):
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+        from riszotto.client import ZoteroPermissionError
+
+        runner = CliRunner()
+
+        zot = MagicMock()
+        monkeypatch.setattr("riszotto.cli.get_client", lambda library=None: zot)
+        monkeypatch.setattr(
+            "riszotto.cli.get_pdf_attachments",
+            lambda zot, key: [{"key": "A", "data": {"md5": "x"}}],
+        )
+
+        def boom(zot, attachment):
+            raise ZoteroPermissionError("API key lacks permission to download file")
+
+        monkeypatch.setattr("riszotto.cli.resolve_pdf_path", boom)
+
+        result = runner.invoke(app, ["show", "ITEMKEY1"])
+        assert result.exit_code == 1
+        assert "permission" in result.output.lower()
