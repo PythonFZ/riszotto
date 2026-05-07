@@ -7,7 +7,6 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from pyzotero import zotero
-from pyzotero.zotero_errors import PyZoteroError
 
 from riszotto.config import load_config
 from riszotto.formatting import CHILD_ITEM_TYPES

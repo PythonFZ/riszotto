@@ -493,8 +493,9 @@ class TestLibraryNotFoundError:
 
 
 class TestGetClientWithLibrary:
+    @patch("riszotto.client.load_config", return_value=Config())
     @patch("riszotto.client.zotero.Zotero")
-    def test_no_library_returns_local_user(self, mock_zotero):
+    def test_no_library_returns_local_user(self, mock_zotero, mock_load_config):
         get_client()
         mock_zotero.assert_called_once_with(
             library_id="0",
