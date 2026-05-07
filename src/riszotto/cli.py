@@ -9,7 +9,6 @@ from typing import Annotated, Optional
 
 import typer
 from pyzotero import zotero
-from pyzotero.zotero_errors import PyZoteroError
 
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,

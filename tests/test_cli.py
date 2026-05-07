@@ -1380,7 +1380,11 @@ class TestLibraries:
             instances.append(kwargs)
             m = MagicMock()
             m.groups.return_value = [
-                {"id": 999, "data": {"name": "G", "numItems": 3}, "meta": {"numItems": 3}}
+                {
+                    "id": 999,
+                    "data": {"name": "G", "numItems": 3},
+                    "meta": {"numItems": 3},
+                }
             ]
             m.num_items.return_value = 0
             return m
