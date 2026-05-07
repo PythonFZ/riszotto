@@ -14,6 +14,7 @@ from pyzotero.zotero_errors import PyZoteroError
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
     AmbiguousLibraryError,
+    ConfigError,
     LibraryNotFoundError,
     PdfNotOnStorageError,
     ZoteroPermissionError,
@@ -73,6 +74,9 @@ def _get_zot(library: str | None = None) -> zotero.Zotero:
     try:
         return get_client(library=library)
     except (LibraryNotFoundError, AmbiguousLibraryError) as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    except ConfigError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1)
     except ConnectionError:
@@ -677,6 +681,9 @@ def show(
         raise typer.Exit(1)
     except ZoteroPermissionError as e:
         typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.echo(f"Failed to retrieve PDF: {e}", err=True)
         raise typer.Exit(1)
     file_path = str(resolved_path)
 

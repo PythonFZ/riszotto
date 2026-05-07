@@ -491,6 +491,17 @@ class TestConnectionError:
         assert result.exit_code == 1
         assert "Zotero desktop is not running" in result.output
 
+    @patch("riszotto.cli.get_client")
+    def test_config_error_surfaces_to_stderr(self, mock_get_client):
+        from riszotto.client import ConfigError
+
+        mock_get_client.side_effect = ConfigError(
+            "Web mode requires `api_key` and `user_id`. Set them in your config."
+        )
+        result = runner.invoke(app, ["search", "x"])
+        assert result.exit_code == 1
+        assert "api_key" in result.output
+
 
 class TestShow:
     @patch("riszotto.cli.resolve_pdf_path")
@@ -2227,6 +2238,30 @@ class TestShowResolvePdfPathErrors:
         assert result.exit_code == 1
         assert "permission" in result.output.lower()
 
+    def test_unexpected_error_surfaces_to_stderr(self, monkeypatch):
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+
+        runner = CliRunner()
+
+        zot = MagicMock()
+        monkeypatch.setattr("riszotto.cli.get_client", lambda library=None: zot)
+        monkeypatch.setattr(
+            "riszotto.cli.get_pdf_attachments",
+            lambda zot, key: [{"key": "A", "data": {"md5": "x"}}],
+        )
+
+        def boom(zot, attachment):
+            raise RuntimeError("server returned 500")
+
+        monkeypatch.setattr("riszotto.cli.resolve_pdf_path", boom)
+
+        result = runner.invoke(app, ["show", "ITEMKEY1"])
+        assert result.exit_code == 1
+        assert "Failed to retrieve PDF" in result.output
+        assert "500" in result.output
+
 
 class TestCacheCommandsWithPdfCache:
     def test_cache_show_reports_both_caches(self, monkeypatch, tmp_path):
@@ -2346,3 +2381,19 @@ class TestCacheCommandsWithPdfCache:
         assert result.exit_code == 0
         assert calls["conv_kwargs"] == {"key": "ABC123", "older_than_days": None}
         assert calls["pdfs"] == 0
+
+    def test_cache_clear_only_pdfs_with_key_errors(self, monkeypatch):
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+
+        runner = CliRunner()
+
+        monkeypatch.setattr("riszotto.cli.clear_cache", lambda **kw: 0)
+        monkeypatch.setattr("riszotto.cli.clear_pdf_cache", lambda: 0)
+
+        result = runner.invoke(
+            app, ["cache", "clear", "--only", "pdfs", "--key", "ABC"]
+        )
+        assert result.exit_code == 1
+        assert "no effect" in result.output or "content-keyed" in result.output
