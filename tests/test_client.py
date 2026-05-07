@@ -5,6 +5,7 @@ import pytest
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
     AmbiguousLibraryError,
+    ConfigError,
     LibraryNotFoundError,
     _filter_bibtex_fields,
     collection_items,
@@ -22,15 +23,52 @@ from riszotto.config import Config
 
 
 class TestGetClient:
-    def test_returns_zotero_instance(self):
+    def _stub_config(self, monkeypatch, mode, api_key=None, user_id=None):
+        from riszotto.config import Config
+
+        monkeypatch.setattr(
+            "riszotto.client.load_config",
+            lambda: Config(api_key=api_key, user_id=user_id, mode=mode),
+        )
+
+    def test_auto_no_creds_returns_local(self, monkeypatch):
+        self._stub_config(monkeypatch, mode="auto")
         with patch("riszotto.client.zotero.Zotero") as mock_zotero:
             get_client()
             mock_zotero.assert_called_once_with(
-                library_id="0",
-                library_type="user",
-                api_key=None,
-                local=True,
+                library_id="0", library_type="user", api_key=None, local=True
             )
+
+    def test_auto_with_creds_returns_remote(self, monkeypatch):
+        self._stub_config(monkeypatch, mode="auto", api_key="k", user_id="123")
+        with patch("riszotto.client.zotero.Zotero") as mock_zotero:
+            get_client()
+            mock_zotero.assert_called_once_with(
+                library_id="123", library_type="user", api_key="k"
+            )
+
+    def test_local_forces_local_even_with_creds(self, monkeypatch):
+        self._stub_config(monkeypatch, mode="local", api_key="k", user_id="123")
+        with patch("riszotto.client.zotero.Zotero") as mock_zotero:
+            get_client()
+            mock_zotero.assert_called_once_with(
+                library_id="0", library_type="user", api_key=None, local=True
+            )
+
+    def test_web_with_creds_returns_remote(self, monkeypatch):
+        self._stub_config(monkeypatch, mode="web", api_key="k", user_id="123")
+        with patch("riszotto.client.zotero.Zotero") as mock_zotero:
+            get_client()
+            mock_zotero.assert_called_once_with(
+                library_id="123", library_type="user", api_key="k"
+            )
+
+    def test_web_without_creds_raises_config_error(self, monkeypatch):
+        from riszotto.client import ConfigError
+
+        self._stub_config(monkeypatch, mode="web")
+        with pytest.raises(ConfigError, match="api_key"):
+            get_client()
 
 
 class TestSearchItems:
@@ -488,16 +526,13 @@ class TestGetClientWithLibrary:
         return_value=Config(api_key="k", user_id="u"),
     )
     @patch("riszotto.client.zotero.Zotero")
-    def test_library_fallback_to_remote(self, mock_zotero, mock_config):
-        mock_local = MagicMock()
-        mock_local.groups.side_effect = ConnectionError("refused")
-
+    def test_library_found_remote_when_creds_present(self, mock_zotero, mock_config):
         mock_remote = MagicMock()
         mock_remote.groups.return_value = [
             {"id": 999, "data": {"name": "Remote Group"}},
         ]
 
-        mock_zotero.side_effect = [mock_local, mock_remote, MagicMock()]
+        mock_zotero.side_effect = [mock_remote, MagicMock()]
 
         get_client(library="Remote Group")
 
@@ -509,12 +544,12 @@ class TestGetClientWithLibrary:
 
     @patch("riszotto.client.load_config", return_value=Config())
     @patch("riszotto.client.zotero.Zotero")
-    def test_library_not_found_no_remote_config(self, mock_zotero, mock_config):
+    def test_library_not_found_raises(self, mock_zotero, mock_config):
         mock_local = MagicMock()
         mock_local.groups.return_value = []
         mock_zotero.return_value = mock_local
 
-        with pytest.raises(LibraryNotFoundError, match="config"):
+        with pytest.raises(LibraryNotFoundError, match="Nonexistent"):
             get_client(library="Nonexistent")
 
     @patch(
@@ -522,16 +557,13 @@ class TestGetClientWithLibrary:
         return_value=Config(api_key="k", user_id="u"),
     )
     @patch("riszotto.client.zotero.Zotero")
-    def test_library_not_found_anywhere(self, mock_zotero, mock_config):
-        mock_local = MagicMock()
-        mock_local.groups.return_value = []
-
+    def test_library_not_found_shows_available(self, mock_zotero, mock_config):
         mock_remote = MagicMock()
         mock_remote.groups.return_value = [
             {"id": 1, "data": {"name": "Other Group"}},
         ]
 
-        mock_zotero.side_effect = [mock_local, mock_remote]
+        mock_zotero.return_value = mock_remote
 
         with pytest.raises(LibraryNotFoundError, match="Other Group"):
             get_client(library="Nonexistent")

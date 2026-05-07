@@ -30,6 +30,10 @@ class AmbiguousLibraryError(Exception):
     """Raised when a library name matches multiple groups."""
 
 
+class ConfigError(Exception):
+    """Raised when configuration is incomplete or invalid for the requested mode."""
+
+
 def find_group(groups: list[dict[str, Any]], library: str) -> dict[str, Any] | None:
     """Match a library name or ID against a list of Zotero groups.
 
@@ -88,6 +92,12 @@ def find_group(groups: list[dict[str, Any]], library: str) -> dict[str, Any] | N
 def get_client(library: str | None = None) -> zotero.Zotero:
     """Create a pyzotero client, optionally targeting a group library.
 
+    Selection is driven by ``config.mode``:
+
+    - ``"local"``: always local (port 23119).
+    - ``"web"``: always remote; raises ``ConfigError`` if creds missing.
+    - ``"auto"`` (default): remote when creds present, else local.
+
     Parameters
     ----------
     library : str or None
@@ -100,59 +110,70 @@ def get_client(library: str | None = None) -> zotero.Zotero:
 
     Raises
     ------
+    ConfigError
+        If ``mode="web"`` and credentials are not configured.
     LibraryNotFoundError
-        If the requested group cannot be found locally or remotely.
+        If the requested group cannot be found in the resolved client.
     AmbiguousLibraryError
         If the name matches multiple groups.
     """
-    if library is None:
-        return zotero.Zotero(
-            library_id="0",
-            library_type="user",
-            api_key=None,
-            local=True,
-        )
-
     config = load_config()
+    use_web = _resolve_use_web(config)
 
-    # Try local first
-    local_client = zotero.Zotero(library_id="0", library_type="user", local=True)
-    try:
-        local_groups = local_client.groups()
-        match = find_group(local_groups, library)
-        if match:
-            return zotero.Zotero(
-                library_id=str(match["id"]),
-                library_type="group",
-                local=True,
-            )
-    except (ConnectionError, OSError, PyZoteroError):
-        pass  # local API not available
+    if library is None:
+        return _make_personal_client(config, use_web)
 
-    # Fall back to remote
-    if not config.has_remote_credentials:
+    base = _make_personal_client(config, use_web)
+    groups = base.groups()
+    match = find_group(groups, library)
+    if match is None:
+        available = [g["data"]["name"] for g in groups]
         raise LibraryNotFoundError(
-            f"Group '{library}' not found locally. "
-            "Configure api_key and user_id in ~/.riszotto/config.toml "
-            "for remote access."
+            f"Group '{library}' not found. Available: {available}"
         )
 
-    remote_client = zotero.Zotero(
-        library_id=config.user_id,
-        library_type="user",
-        api_key=config.api_key,
-    )
-    remote_groups = remote_client.groups()
-    match = find_group(remote_groups, library)
-    if match:
+    if use_web:
         return zotero.Zotero(
             library_id=str(match["id"]),
             library_type="group",
             api_key=config.api_key,
         )
+    return zotero.Zotero(
+        library_id=str(match["id"]),
+        library_type="group",
+        local=True,
+    )
 
-    available = [g["data"]["name"] for g in remote_groups]
-    raise LibraryNotFoundError(f"Group '{library}' not found. Available: {available}")
+
+def _resolve_use_web(config) -> bool:
+    """Return True if the resolved mode wants the web API."""
+    if config.mode == "local":
+        return False
+    if config.mode == "web":
+        if not config.has_remote_credentials:
+            raise ConfigError(
+                "Web mode requires `api_key` and `user_id`. "
+                "Configure in ~/.riszotto/config.toml [zotero] or set "
+                "RISZOTTO_ZOTERO_API_KEY and RISZOTTO_ZOTERO_USER_ID."
+            )
+        return True
+    # auto
+    return config.has_remote_credentials
+
+
+def _make_personal_client(config, use_web: bool) -> zotero.Zotero:
+    if use_web:
+        return zotero.Zotero(
+            library_id=config.user_id,
+            library_type="user",
+            api_key=config.api_key,
+        )
+    return zotero.Zotero(
+        library_id="0",
+        library_type="user",
+        api_key=None,
+        local=True,
+    )
 
 
 def search_items(
