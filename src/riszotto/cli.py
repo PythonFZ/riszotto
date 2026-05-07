@@ -1032,6 +1032,7 @@ def libraries() -> None:
 
 # ── Cache command group ──────────────────────────────────────────────
 
+
 @app.command()
 def config() -> None:
     """Show the resolved config path and the currently-loaded values.

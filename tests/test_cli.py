@@ -1487,9 +1487,7 @@ class TestConfigCommand:
         from riszotto.config import Config
 
         config_file = tmp_path / "config.toml"
-        config_file.write_text(
-            '[zotero]\napi_key = "K"\nuser_id = "U"\nmode = "web"\n'
-        )
+        config_file.write_text('[zotero]\napi_key = "K"\nuser_id = "U"\nmode = "web"\n')
         monkeypatch.setattr("riszotto.config.CONFIG_PATH", config_file)
         monkeypatch.setattr("riszotto.cli.CONFIG_PATH", config_file)
         monkeypatch.setattr(
@@ -1520,7 +1518,9 @@ class TestConfigCommand:
         result = runner.invoke(app, ["config"])
         assert result.exit_code == 0
         assert str(missing) in result.output
-        assert "not found" in result.output.lower() or "missing" in result.output.lower()
+        assert (
+            "not found" in result.output.lower() or "missing" in result.output.lower()
+        )
 
 
 class TestLibraryFlag:
