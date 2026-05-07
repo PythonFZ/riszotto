@@ -24,7 +24,7 @@ This blocks two real workflows:
 | Config loader | `pydantic-settings` | Replaces hand-rolled `tomllib` + `os.environ` in `config.py`; consistent precedence rules; field validation |
 | Personal library client selection | Same rule as group libraries (mode-driven) | Collapses two code paths into one; removes the `library is None` special case in `_get_zot()` |
 | PDF cache key | `attachment.data.md5` from Zotero metadata | Empirically present iff file is on Zotero storage (1:1 with downloadability); content-addressed; no need to hash twice |
-| PDF cache layout | `cache_dir/pdfs/{library_id}_{attachment_key}_{md5}.pdf` | Disambiguates across libraries and attachments; `md5` is auto-invalidating |
+| PDF cache layout | `cache_dir/pdfs/{md5}.pdf` | md5 is a content hash, so it's globally unique. Two attachments with the same PDF (same paper across libraries) deduplicate naturally |
 | md5 absent handling | Hard error with source URL | md5 is `None` iff the file is not on Zotero storage and download will 404; no useful fallback at the API level |
 | Markdown cache | Untouched | Existing sha256-keyed `converter/cache.py` already handles content-addressing post-download |
 | Out of scope | URL-based fallback (publisher scraping) | Different concern (auth, paywalls, robots policy); deferred |
@@ -45,13 +45,15 @@ All three fields are optional.
 
 ### Environment variables
 
+All env vars use the `RISZOTTO_` prefix via pydantic-settings `env_prefix = "RISZOTTO_"`, with nested delimiter `__` so the `[zotero]` table maps to `RISZOTTO_ZOTERO_*`.
+
 | Config key | Env var | Notes |
 |-----------|---------|-------|
-| `api_key` | `ZOTERO_API_KEY` | Existing |
-| `user_id` | `ZOTERO_USER_ID` | Existing |
-| `mode` | `RISZOTTO_MODE` | New. Values validated against the `Literal` type |
+| `zotero.api_key` | `RISZOTTO_ZOTERO_API_KEY` | Renamed from `ZOTERO_API_KEY` (breaking) |
+| `zotero.user_id` | `RISZOTTO_ZOTERO_USER_ID` | Renamed from `ZOTERO_USER_ID` (breaking) |
+| `zotero.mode` | `RISZOTTO_ZOTERO_MODE` | New. Values validated against the `Literal` type |
 
-Source precedence (lowest to highest): defaults → TOML → env vars. Implemented via `pydantic-settings` `BaseSettings`.
+Source precedence (lowest to highest): defaults → TOML → env vars. Implemented via `pydantic-settings` `BaseSettings` with `env_nested_delimiter="__"`.
 
 ### Mode resolution
 
@@ -78,10 +80,10 @@ Three coordinated changes, each isolated to one concern:
    - Add `resolve_pdf_path(zot, attachment) -> Path` (new public function). Replaces direct calls to `get_pdf_path()` in `cli.py:670`. Encapsulates: try local enclosure → check raw-PDF cache → download via `zot.dump()`.
 
 3. **`src/riszotto/paths.py` + new module `src/riszotto/pdf_cache.py`** — add `PDF_CACHE_DIR = cache_dir() / "pdfs"`. New module exposes:
-   - `pdf_cache_path(library_id, attachment_key, md5) -> Path`
-   - `read_pdf_cache(library_id, attachment_key, md5) -> Path | None`
-   - `download_to_pdf_cache(zot, attachment) -> Path` (calls `zot.dump()`)
-   - `clear_pdf_cache(...) -> int` and `pdf_cache_stats() -> dict` to integrate with the existing `cache show` / `cache clear` CLI subcommands.
+   - `pdf_cache_path(md5) -> Path` — returns `PDF_CACHE_DIR / f"{md5}.pdf"`
+   - `read_pdf_cache(md5) -> Path | None`
+   - `download_to_pdf_cache(zot, attachment) -> Path` (calls `zot.dump()` writing to `pdf_cache_path(attachment["data"]["md5"])`)
+   - `clear_pdf_cache() -> int` and `pdf_cache_stats() -> dict` to integrate with the existing `cache show` / `cache clear` CLI subcommands.
 
 ## Data Flow: `show` Command
 
@@ -147,16 +149,16 @@ ${cache_dir}/
 │           ├── meta.json
 │           └── *.png
 └── pdfs/                                # NEW
-    └── {library_id}_{attachment_key}_{md5}.pdf
+    └── {md5}.pdf
 ```
 
-PDF cache invalidation is implicit: `md5` is the file's content hash, so any change in the underlying file produces a different cache filename. Stale entries linger until manually cleared — acceptable while corpus is small.
+PDF cache invalidation is implicit: `md5` is the file's content hash, so any change in the underlying file produces a different cache filename. The same paper present in multiple libraries deduplicates to a single cache entry. Stale entries linger until manually cleared — acceptable while corpus is small.
 
 ## Error Handling
 
 | Trigger | Error class | User-facing message |
 |---------|-------------|---------------------|
-| `mode="web"` + missing creds | `ConfigError` (existing) | "Web mode requires `api_key` and `user_id`. Configure in `~/.riszotto/config.toml [zotero]` or set `ZOTERO_API_KEY` and `ZOTERO_USER_ID`." |
+| `mode="web"` + missing creds | `ConfigError` (existing) | "Web mode requires `api_key` and `user_id`. Configure in `~/.riszotto/config.toml [zotero]` or set `RISZOTTO_ZOTERO_API_KEY` and `RISZOTTO_ZOTERO_USER_ID`." |
 | `mode="local"` + Zotero not running | Existing connection error | Unchanged ("Start Zotero or configure api_key…") |
 | `mode="auto"` + neither | Existing | Unchanged |
 | Remote attachment with `md5=None` | `PdfNotOnStorageError` (new) | "PDF for {key} is not on Zotero storage (file sync disabled or metadata-only attachment). Source URL: {data.url}. Run riszotto in local mode, or enable file sync in Zotero preferences." |
@@ -171,7 +173,7 @@ PDF cache invalidation is implicit: `md5` is the file's content hash, so any cha
 No new commands. `cache show` and `cache clear` extend to cover the new `pdfs/` directory:
 
 - `cache show` reports both conversion and PDF cache sizes/counts.
-- `cache clear` (with no flags) clears both. New `--only conversions|pdfs` flag for selective clearing. `--key KEY` clears entries for a single Zotero key across both caches.
+- `cache clear` (with no flags) clears both. New `--only conversions|pdfs` flag for selective clearing. `--key KEY` continues to scope to a single Zotero key — but only the markdown cache is key-scoped, since the PDF cache is content-keyed (md5) and not associated with any specific Zotero key. This is documented in `cache clear --help`.
 
 The `show` command itself takes no new flags. Mode is config-only.
 
@@ -179,7 +181,7 @@ The `show` command itself takes no new flags. Mode is config-only.
 
 | Layer | Tests |
 |-------|-------|
-| `config.py` | Pydantic-settings precedence: defaults → TOML → env. Invalid `mode` value rejected. Backward compat: existing TOML without `mode` parses fine. |
+| `config.py` | Pydantic-settings precedence: defaults → TOML → `RISZOTTO_ZOTERO_*` env vars. Invalid `mode` value rejected. Existing TOML without `mode` parses fine (defaults to `"auto"`). Old `ZOTERO_API_KEY` / `ZOTERO_USER_ID` env vars are *not* read (breaking change, see Migration). |
 | `client.py: _get_zot()` | Matrix of `mode` × creds-present × `library` (None / group). Mocks `pyzotero.Zotero` constructor; asserts `library_id`/`library_type`/`api_key`/`local` flags on the returned client. |
 | `client.py: resolve_pdf_path()` | (a) local enclosure exists → returns it. (b) local enclosure missing + md5 present + PDF cache hit → returns cache path, `zot.dump` not called. (c) Same + cache miss → `zot.dump` called once, returns new path. (d) md5 None → raises `PdfNotOnStorageError` with `source_url` set. (e) `zot.dump` raises 404 → raises `PdfNotOnStorageError`. (f) `zot.dump` raises 403 → raises `PermissionError`. |
 | `pdf_cache.py` | Path construction; cache hit/miss; `clear_pdf_cache(key=...)` removes only matching files. |
@@ -191,6 +193,7 @@ The `show` command itself takes no new flags. Mode is config-only.
 
 - **No `[zotero]` section configured:** behavior identical to today. `mode="auto"` + no creds → local-only.
 - **Creds configured, no `mode` field:** defaults to `mode="auto"`. **Behavior change:** the personal library now uses the web API instead of falling back to local. Documented in `CHANGELOG.md` and the README.
+- **Env var rename (breaking):** `ZOTERO_API_KEY` → `RISZOTTO_ZOTERO_API_KEY`, `ZOTERO_USER_ID` → `RISZOTTO_ZOTERO_USER_ID`. Old names are no longer read. Documented in `CHANGELOG.md` and the README. Migration is one-line shell change for affected users; TOML config is unchanged.
 - **Old "personal=local, groups=web-fallback" hybrid is removed.** Users who specifically want the personal library to stay local while groups use the web API have two options:
   - Leave `mode="auto"` and run Zotero locally — `auto` picks local when no creds reach it; if creds *are* set, web takes over uniformly (the new behavior).
   - Set `mode="local"` to force local everywhere; group lookups will then fail when the group is not synced locally, which matches the pre-groups-feature state.
