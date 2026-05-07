@@ -640,9 +640,7 @@ class TestShow:
 
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
-    def test_show_last_page_omits_next_hint(
-        self, mock_get_client, mock_get_converter
-    ):
+    def test_show_last_page_omits_next_hint(self, mock_get_client, mock_get_converter):
         from riszotto.converter.base import ConversionResult
 
         mock_zot = MagicMock()
