@@ -27,6 +27,7 @@ from riszotto.client import (
     search_items,
 )
 from riszotto.config import load_config
+from riszotto.paths import CONFIG_PATH
 from riszotto.converter import get_converter
 from riszotto.converter.cache import clear_cache, get_cache_stats
 from riszotto.pdf_cache import clear_pdf_cache, pdf_cache_stats
@@ -1030,6 +1031,31 @@ def libraries() -> None:
 
 
 # ── Cache command group ──────────────────────────────────────────────
+
+@app.command()
+def config() -> None:
+    """Show the resolved config path and the currently-loaded values.
+
+    The config file location follows OS conventions (platformdirs), so it is
+    not always ``~/.riszotto/config.toml``. Run ``riszotto config`` to see
+    where to place the file on this machine.
+    """
+    cfg = load_config()
+    typer.echo(f"Config file: {CONFIG_PATH}")
+    typer.echo(
+        f"  Status: {'exists' if CONFIG_PATH.is_file() else 'not found (file is missing — env vars are the only source)'}"
+    )
+    typer.echo("")
+    typer.echo("Loaded values:")
+    typer.echo(f"  api_key: {'set' if cfg.api_key else 'unset'}")
+    typer.echo(f"  user_id: {cfg.user_id if cfg.user_id else 'unset'}")
+    typer.echo(f"  mode:    {cfg.mode}")
+    typer.echo("")
+    typer.echo("Env-var overrides (highest precedence):")
+    typer.echo("  RISZOTTO_ZOTERO_API_KEY")
+    typer.echo("  RISZOTTO_ZOTERO_USER_ID")
+    typer.echo("  RISZOTTO_ZOTERO_MODE")
+
 
 cache_app = typer.Typer(add_completion=False, help="Manage the conversion cache.")
 app.add_typer(cache_app, name="cache")

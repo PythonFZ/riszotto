@@ -71,7 +71,17 @@ All commands support `--library` / `-L` to target a group library by name or ID.
 
 ## Configuration
 
-riszotto reads `~/.riszotto/config.toml`:
+The config file path follows OS conventions (via `platformdirs`). Run
+`riszotto config` to print the resolved path and the currently-loaded
+values on your machine. Typical locations:
+
+| OS | Path |
+|----|------|
+| macOS | `~/Library/Application Support/riszotto/config.toml` |
+| Linux | `$XDG_CONFIG_HOME/riszotto/config.toml` (defaults to `~/.config/riszotto/config.toml`) |
+| Windows | `%APPDATA%\riszotto\config.toml` |
+
+Contents:
 
 ```toml
 [zotero]
@@ -97,10 +107,10 @@ Environment variables (override the TOML file):
 - `RISZOTTO_ZOTERO_MODE`
 
 In web mode, `show` downloads attachment PDFs into a content-addressed
-cache at `~/.cache/riszotto/pdfs/{md5}.pdf` (deduplicated across libraries).
-The PDF must be on Zotero storage — attachments with `md5 = null` (file
-sync disabled, metadata-only attachments) cannot be retrieved over the
-web API.
+cache (path varies by OS — see `riszotto cache show`) under `pdfs/{md5}.pdf`,
+deduplicated across libraries. The PDF must be on Zotero storage —
+attachments with `md5 = null` (file sync disabled, metadata-only
+attachments) cannot be retrieved over the web API.
 
 ## Claude Code Skill
 
