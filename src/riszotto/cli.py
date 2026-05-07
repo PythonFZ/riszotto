@@ -720,7 +720,7 @@ def show(
 
 @app.command()
 def export(
-    key: Annotated[str, typer.Argument(help="Zotero item key")],
+    keys: Annotated[list[str], typer.Argument(help="Zotero item key(s)")],
     format: Annotated[
         str, typer.Option("--format", "-f", help="Export format")
     ] = "bibtex",
@@ -733,17 +733,29 @@ def export(
     ] = False,
     library: LibraryOption = None,
 ) -> None:
-    """Export an item in the specified format."""
-    zot = _get_zot(library=library)
-    if format == "bibtex":
-        excluded = (
-            set()
-            if include_all
-            else (set(exclude) if exclude else DEFAULT_BIBTEX_EXCLUDE)
-        )
-        typer.echo(get_item_bibtex(zot, key, exclude=excluded))
-    else:
+    """Export one or more items in the specified format."""
+    if format != "bibtex":
         typer.echo(f"Unknown format: {format}", err=True)
+        raise typer.Exit(1)
+
+    zot = _get_zot(library=library)
+    excluded = (
+        set() if include_all else (set(exclude) if exclude else DEFAULT_BIBTEX_EXCLUDE)
+    )
+
+    successes = 0
+    for key in keys:
+        try:
+            entry = get_item_bibtex(zot, key, exclude=excluded)
+        except Exception as e:
+            typer.echo(f"Failed to export {key}: {e}", err=True)
+            continue
+        if successes > 0:
+            typer.echo()
+        typer.echo(entry)
+        successes += 1
+
+    if successes == 0:
         raise typer.Exit(1)
 
 

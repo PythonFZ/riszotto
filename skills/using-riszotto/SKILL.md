@@ -27,6 +27,7 @@ Default: personal library. Use `-L "Name"` for groups, `-A` for all libraries. D
 - Truncate titles manually with `[:80]` — the table already truncates
 - Parse table output with scripts — if you truly need structured data, use `--format json`, but question why first
 - Chain multiple searches in a single shell command with `echo "---"` separators
+- Loop `riszotto export` per key in a shell — pass all keys to one call: `riszotto export K1 K2 K3`
 
 ## Quick Reference
 
@@ -43,7 +44,7 @@ Default: personal library. Use `-L "Name"` for groups, `-A` for all libraries. D
 | Filter by tag | `riszotto search "topic" --tag "tag"` |
 | Read paper | `riszotto show <KEY>` |
 | Search within PDF | `riszotto show <KEY> --search "term"` |
-| Export BibTeX | `riszotto export <KEY>` |
+| Export BibTeX | `riszotto export <KEY> [<KEY> ...]` |
 | Collections | `riszotto collections` |
 | Recent papers | `riszotto recent` |
 | Build semantic index | `riszotto index` |
