@@ -1522,6 +1522,32 @@ class TestConfigCommand:
             "not found" in result.output.lower() or "missing" in result.output.lower()
         )
 
+    def test_reports_env_var_state(self, monkeypatch, tmp_path):
+        """Each env var must be reported as 'set' or 'not set', not just listed."""
+        from riszotto.config import Config
+
+        monkeypatch.setattr("riszotto.cli.CONFIG_PATH", tmp_path / "x.toml")
+        monkeypatch.setattr("riszotto.cli.load_config", lambda: Config())
+        monkeypatch.setenv("RISZOTTO_ZOTERO_API_KEY", "secret-token")
+        monkeypatch.delenv("RISZOTTO_ZOTERO_USER_ID", raising=False)
+        monkeypatch.delenv("RISZOTTO_ZOTERO_MODE", raising=False)
+
+        result = runner.invoke(app, ["config"])
+        assert result.exit_code == 0
+        out = result.output
+        api_line = next(
+            line for line in out.splitlines() if "RISZOTTO_ZOTERO_API_KEY" in line
+        )
+        assert "set" in api_line.lower()
+        assert "not set" not in api_line.lower()
+        # Secret token must NOT appear in the output
+        assert "secret-token" not in out
+
+        uid_line = next(
+            line for line in out.splitlines() if "RISZOTTO_ZOTERO_USER_ID" in line
+        )
+        assert "not set" in uid_line.lower()
+
 
 class TestLibraryFlag:
     @patch("riszotto.cli.get_client")

@@ -1041,6 +1041,8 @@ def config() -> None:
     not always ``~/.riszotto/config.toml``. Run ``riszotto config`` to see
     where to place the file on this machine.
     """
+    import os
+
     cfg = load_config()
     typer.echo(f"Config file: {CONFIG_PATH}")
     typer.echo(
@@ -1052,10 +1054,14 @@ def config() -> None:
     typer.echo(f"  user_id: {cfg.user_id if cfg.user_id else 'unset'}")
     typer.echo(f"  mode:    {cfg.mode}")
     typer.echo("")
-    typer.echo("Env-var overrides (highest precedence):")
-    typer.echo("  RISZOTTO_ZOTERO_API_KEY")
-    typer.echo("  RISZOTTO_ZOTERO_USER_ID")
-    typer.echo("  RISZOTTO_ZOTERO_MODE")
+    typer.echo("Environment variables (override the config file when set):")
+    for var in (
+        "RISZOTTO_ZOTERO_API_KEY",
+        "RISZOTTO_ZOTERO_USER_ID",
+        "RISZOTTO_ZOTERO_MODE",
+    ):
+        state = "set" if os.environ.get(var) else "not set"
+        typer.echo(f"  {var}: {state}")
 
 
 cache_app = typer.Typer(add_completion=False, help="Manage the conversion cache.")
