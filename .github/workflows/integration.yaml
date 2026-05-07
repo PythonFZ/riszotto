@@ -1,0 +1,39 @@
+name: Integration (Zotero Web API)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, labeled]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    # On PRs, only run when the PR has the "ci:integration" label and was
+    # opened from a same-repo branch. Fork PRs cannot read repo secrets and
+    # are skipped explicitly to avoid confusing failures.
+    if: >
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(github.event.pull_request.labels.*.name, 'ci:integration'))
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install with [full] extras
+        run: uv sync --extra full
+
+      - name: Run integration tests
+        env:
+          RISZOTTO_ZOTERO_API_KEY: ${{ secrets.RISZOTTO_ZOTERO_API_KEY }}
+          RISZOTTO_ZOTERO_USER_ID: ${{ secrets.RISZOTTO_ZOTERO_USER_ID }}
+          RISZOTTO_TEST_GROUP_ID: ${{ secrets.RISZOTTO_TEST_GROUP_ID }}
+          RISZOTTO_TEST_GROUP_ITEM_KEY: ${{ secrets.RISZOTTO_TEST_GROUP_ITEM_KEY }}
+          RISZOTTO_TEST_PERSONAL_ITEM_KEY: ${{ secrets.RISZOTTO_TEST_PERSONAL_ITEM_KEY }}
+        run: uv run pytest -m integration -v

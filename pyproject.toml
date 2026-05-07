@@ -46,3 +46,9 @@ version-file = "src/riszotto/_version.py"
 dev = [
     "pytest>=9.0.2",
 ]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not integration'"
+markers = [
+    "integration: tests that hit api.zotero.org (require RISZOTTO_ZOTERO_API_KEY env vars; skipped otherwise)",
+]
