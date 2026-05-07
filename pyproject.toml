@@ -48,7 +48,6 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-m 'not integration'"
 markers = [
-    "integration: tests that hit api.zotero.org (require RISZOTTO_ZOTERO_API_KEY env vars; skipped otherwise)",
+    "integration: tests that hit api.zotero.org; skipif decorator on the tests skips them when RISZOTTO_ZOTERO_* env vars are absent",
 ]

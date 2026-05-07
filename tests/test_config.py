@@ -8,6 +8,20 @@ from riszotto.config import Config, load_config
 
 
 class TestConfig:
+    @pytest.fixture(autouse=True)
+    def _clear_riszotto_env(self, monkeypatch):
+        """Remove inherited RISZOTTO_ZOTERO_* env vars so each test starts clean.
+
+        CI and developer shells may have these set (e.g. for integration tests),
+        which would otherwise leak into the unit-level config tests.
+        """
+        for var in (
+            "RISZOTTO_ZOTERO_API_KEY",
+            "RISZOTTO_ZOTERO_USER_ID",
+            "RISZOTTO_ZOTERO_MODE",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
     def test_defaults_when_no_file_no_env(self, tmp_path):
         with patch("riszotto.config.CONFIG_PATH", tmp_path / "config.toml"):
             config = load_config()
