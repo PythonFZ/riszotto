@@ -29,6 +29,7 @@ from riszotto.client import (
 from riszotto.config import load_config
 from riszotto.converter import get_converter
 from riszotto.converter.cache import clear_cache, get_cache_stats
+from riszotto.pdf_cache import clear_pdf_cache, pdf_cache_stats
 from riszotto.formatting import (
     format_creator,
     format_items_table,
@@ -1055,18 +1056,26 @@ def cache_show(
     ] = None,
 ) -> None:
     """Show cache statistics."""
-    stats = get_cache_stats(key=key)
-    if key and stats["paper_count"] == 0:
+    md_stats = get_cache_stats(key=key)
+    if key and md_stats["paper_count"] == 0:
         typer.echo(f"No cached data for {key}.")
-        return
-    typer.echo(
-        f"Cache: {stats['paper_count']} paper(s), "
-        f"{_format_bytes(stats['total_bytes'])}. "
-        f"Path: {stats['path']}"
-    )
-    if stats.get("papers"):
-        for p in stats["papers"]:
-            typer.echo(f"  {p['key']}: {_format_bytes(p['bytes'])}")
+    else:
+        typer.echo(
+            f"Markdown cache: {md_stats['paper_count']} paper(s), "
+            f"{_format_bytes(md_stats['total_bytes'])}. "
+            f"Path: {md_stats['path']}"
+        )
+        if md_stats.get("papers"):
+            for p in md_stats["papers"]:
+                typer.echo(f"  {p['key']}: {_format_bytes(p['bytes'])}")
+
+    if key is None:
+        pdf_stats = pdf_cache_stats()
+        typer.echo(
+            f"PDF cache: {pdf_stats['count']} file(s), "
+            f"{_format_bytes(pdf_stats['total_bytes'])}. "
+            f"Path: {pdf_stats['path']}"
+        )
 
 
 def _parse_duration(s: str) -> int | None:
@@ -1080,7 +1089,7 @@ def _parse_duration(s: str) -> int | None:
 def cache_clear(
     key: Annotated[
         Optional[str],
-        typer.Option("--key", "-k", help="Clear cache for a specific paper"),
+        typer.Option("--key", "-k", help="Clear cache for a specific paper (markdown only)"),
     ] = None,
     older_than: Annotated[
         Optional[str],
@@ -1088,8 +1097,24 @@ def cache_clear(
             "--older-than", help="Clear entries older than duration (e.g., 30d)"
         ),
     ] = None,
+    only: Annotated[
+        Optional[str],
+        typer.Option(
+            "--only",
+            help="Restrict to one cache: 'conversions' or 'pdfs'",
+        ),
+    ] = None,
 ) -> None:
-    """Clear cached conversions."""
+    """Clear cached conversions and downloaded PDFs.
+
+    Without --only, both caches are cleared. ``--key`` only scopes the
+    markdown (conversions) cache; the PDF cache is content-keyed and not
+    associated with a specific Zotero key.
+    """
+    if only is not None and only not in ("conversions", "pdfs"):
+        typer.echo("Invalid --only value. Use 'conversions' or 'pdfs'.", err=True)
+        raise typer.Exit(1)
+
     older_than_days = None
     if older_than is not None:
         older_than_days = _parse_duration(older_than)
@@ -1100,5 +1125,21 @@ def cache_clear(
             )
             raise typer.Exit(1)
 
-    cleared = clear_cache(key=key, older_than_days=older_than_days)
-    typer.echo(f"Cleared {cleared} paper(s) from cache.")
+    if only in (None, "conversions"):
+        md_cleared = clear_cache(key=key, older_than_days=older_than_days)
+        typer.echo(f"Cleared {md_cleared} paper(s) from markdown cache.")
+
+    if only in (None, "pdfs"):
+        if key is not None and only is None:
+            # Default --key behavior: only conversions get scoped; PDF cache untouched.
+            pass
+        elif only == "pdfs" and key is not None:
+            typer.echo(
+                "--key has no effect on the PDF cache (content-keyed). "
+                "Run without --key to clear all cached PDFs.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        else:
+            pdf_cleared = clear_pdf_cache()
+            typer.echo(f"Cleared {pdf_cleared} file(s) from PDF cache.")

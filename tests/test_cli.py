@@ -2226,3 +2226,123 @@ class TestShowResolvePdfPathErrors:
         result = runner.invoke(app, ["show", "ITEMKEY1"])
         assert result.exit_code == 1
         assert "permission" in result.output.lower()
+
+
+class TestCacheCommandsWithPdfCache:
+    def test_cache_show_reports_both_caches(self, monkeypatch, tmp_path):
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+
+        runner = CliRunner()
+
+        monkeypatch.setattr(
+            "riszotto.cli.get_cache_stats",
+            lambda key=None: {
+                "paper_count": 2,
+                "total_bytes": 1024,
+                "path": "/conv",
+                "papers": [],
+            },
+        )
+        monkeypatch.setattr(
+            "riszotto.cli.pdf_cache_stats",
+            lambda: {"count": 3, "total_bytes": 5_000_000, "path": "/pdfs"},
+        )
+
+        result = runner.invoke(app, ["cache", "show"])
+        assert result.exit_code == 0
+        assert "2 paper" in result.output  # markdown cache
+        assert "3" in result.output  # pdf count
+        assert "/pdfs" in result.output
+
+    def test_cache_clear_clears_both_by_default(self, monkeypatch):
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+
+        runner = CliRunner()
+
+        calls = {"conv": 0, "pdfs": 0}
+
+        def fake_clear_cache(*, key=None, older_than_days=None):
+            calls["conv"] += 1
+            return 5
+
+        def fake_clear_pdf_cache():
+            calls["pdfs"] += 1
+            return 7
+
+        monkeypatch.setattr("riszotto.cli.clear_cache", fake_clear_cache)
+        monkeypatch.setattr("riszotto.cli.clear_pdf_cache", fake_clear_pdf_cache)
+
+        result = runner.invoke(app, ["cache", "clear"])
+        assert result.exit_code == 0
+        assert calls == {"conv": 1, "pdfs": 1}
+        assert "5" in result.output
+        assert "7" in result.output
+
+    def test_cache_clear_only_conversions(self, monkeypatch):
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+
+        runner = CliRunner()
+        calls = {"conv": 0, "pdfs": 0}
+        monkeypatch.setattr(
+            "riszotto.cli.clear_cache",
+            lambda **kw: calls.__setitem__("conv", calls["conv"] + 1) or 1,
+        )
+        monkeypatch.setattr(
+            "riszotto.cli.clear_pdf_cache",
+            lambda: calls.__setitem__("pdfs", calls["pdfs"] + 1) or 1,
+        )
+
+        result = runner.invoke(app, ["cache", "clear", "--only", "conversions"])
+        assert result.exit_code == 0
+        assert calls == {"conv": 1, "pdfs": 0}
+
+    def test_cache_clear_only_pdfs(self, monkeypatch):
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+
+        runner = CliRunner()
+        calls = {"conv": 0, "pdfs": 0}
+        monkeypatch.setattr(
+            "riszotto.cli.clear_cache",
+            lambda **kw: calls.__setitem__("conv", calls["conv"] + 1) or 1,
+        )
+        monkeypatch.setattr(
+            "riszotto.cli.clear_pdf_cache",
+            lambda: calls.__setitem__("pdfs", calls["pdfs"] + 1) or 1,
+        )
+
+        result = runner.invoke(app, ["cache", "clear", "--only", "pdfs"])
+        assert result.exit_code == 0
+        assert calls == {"conv": 0, "pdfs": 1}
+
+    def test_cache_clear_with_key_does_not_clear_pdfs(self, monkeypatch):
+        """--key only scopes the markdown cache; PDF cache is content-keyed."""
+        from typer.testing import CliRunner
+
+        from riszotto.cli import app
+
+        runner = CliRunner()
+        calls = {"conv_kwargs": None, "pdfs": 0}
+
+        def fake_clear_cache(*, key=None, older_than_days=None):
+            calls["conv_kwargs"] = {"key": key, "older_than_days": older_than_days}
+            return 1
+
+        def fake_clear_pdf_cache():
+            calls["pdfs"] += 1
+            return 0
+
+        monkeypatch.setattr("riszotto.cli.clear_cache", fake_clear_cache)
+        monkeypatch.setattr("riszotto.cli.clear_pdf_cache", fake_clear_pdf_cache)
+
+        result = runner.invoke(app, ["cache", "clear", "--key", "ABC123"])
+        assert result.exit_code == 0
+        assert calls["conv_kwargs"] == {"key": "ABC123", "older_than_days": None}
+        assert calls["pdfs"] == 0
