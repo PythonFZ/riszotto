@@ -81,6 +81,28 @@ def test_show_downloads_pdf_and_caches_it(tmp_path, monkeypatch):
     assert path2.stat().st_size == size_after_download
 
 
+def test_libraries_command_works_without_local_zotero():
+    """`riszotto libraries` returns 0 when Zotero desktop is unreachable.
+
+    On CI runners there is no Zotero desktop; the command must enumerate
+    libraries via the Web API and not surface an httpx.ConnectError to the
+    user. Regression for the bug where _discover_libraries hardcoded
+    local=True for group clients regardless of the active mode.
+    """
+    from typer.testing import CliRunner
+
+    from riszotto.cli import app
+
+    result = CliRunner().invoke(app, ["libraries"])
+    assert result.exit_code == 0, (
+        f"libraries exit {result.exit_code}\n--- output ---\n{result.output}"
+    )
+    assert "My Library" in result.output
+    # The "Connection refused" httpx error must never reach the user.
+    assert "Connection refused" not in result.output
+    assert "Traceback" not in result.output
+
+
 def test_personal_md5_null_raises_clean_error(tmp_path, monkeypatch):
     """Personal-library items with md5=None surface PdfNotOnStorageError."""
     monkeypatch.setattr("riszotto.pdf_cache.PDF_CACHE_DIR", tmp_path)

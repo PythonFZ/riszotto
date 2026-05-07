@@ -1356,6 +1356,46 @@ class TestIndex:
 
 
 class TestLibraries:
+    def test_web_mode_does_not_construct_local_clients(self, monkeypatch):
+        """Regression: in mode='web', _discover_libraries must not build any
+        client with ``local=True``. Doing so causes the libraries command to
+        try localhost:23119 for ``num_items()`` even when Zotero desktop is
+        not running, surfacing an httpx.ConnectError traceback to the user.
+        """
+        from riszotto.cli import _discover_libraries
+        from riszotto.config import Config
+
+        monkeypatch.setattr(
+            "riszotto.cli.load_config",
+            lambda: Config(api_key="k", user_id="123", mode="web"),
+        )
+        monkeypatch.setattr(
+            "riszotto.client.load_config",
+            lambda: Config(api_key="k", user_id="123", mode="web"),
+        )
+
+        instances: list[dict] = []
+
+        def track(*args, **kwargs):
+            instances.append(kwargs)
+            m = MagicMock()
+            m.groups.return_value = [
+                {"id": 999, "data": {"name": "G", "numItems": 3}, "meta": {"numItems": 3}}
+            ]
+            m.num_items.return_value = 0
+            return m
+
+        monkeypatch.setattr("riszotto.cli.zotero.Zotero", track)
+        monkeypatch.setattr("riszotto.client.zotero.Zotero", track)
+
+        _discover_libraries()
+
+        assert instances, "expected at least one Zotero client to be constructed"
+        for kw in instances:
+            assert kw.get("local") is not True, (
+                f"web mode must not construct local clients; got {kw}"
+            )
+
     @patch("riszotto.cli.zotero.Zotero")
     @patch("riszotto.cli.load_config")
     @patch("riszotto.cli.get_client")
@@ -1401,26 +1441,26 @@ class TestLibraries:
     def test_lists_remote_groups(self, mock_get_client, mock_config, mock_zotero_cls):
         from riszotto.config import Config
 
-        mock_config.return_value = Config(api_key="k", user_id="u")
-        mock_local = MagicMock()
-        mock_get_client.return_value = mock_local
-        mock_local.groups.return_value = [
-            {"id": 111, "data": {"name": "Local Group"}},
-        ]
+        # auto + creds → remote client is canonical, listing groups via the web API
+        mock_config.return_value = Config(api_key="k", user_id="u", mode="auto")
         mock_remote = MagicMock()
-        mock_zotero_cls.return_value = mock_remote
+        mock_get_client.return_value = mock_remote
         mock_remote.groups.return_value = [
-            {"id": 111, "data": {"name": "Local Group"}},
-            {"id": 222, "data": {"name": "Remote Only"}},
+            {"id": 111, "data": {"name": "Lab Group"}, "meta": {"numItems": 7}},
+            {"id": 222, "data": {"name": "Remote Only"}, "meta": {"numItems": 3}},
         ]
+        mock_group_zot = MagicMock()
+        mock_group_zot.num_items.return_value = 7
+        mock_zotero_cls.return_value = mock_group_zot
 
         result = runner.invoke(app, ["libraries"])
         assert result.exit_code == 0
-        assert "Local Group" in result.output
+        assert "Lab Group" in result.output
         assert "Remote Only" in result.output
-        lines = result.output.strip().split("\n")
-        local_line = [line for line in lines if "Local Group" in line][0]
-        assert "local" in local_line
+        # All lines should be sourced from "remote" since creds are set
+        for line in result.output.strip().split("\n"):
+            if "Lab Group" in line or "Remote Only" in line:
+                assert "remote" in line
 
     @patch("riszotto.cli.load_config")
     @patch("riszotto.cli.get_client")

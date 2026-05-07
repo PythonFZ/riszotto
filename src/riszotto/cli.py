@@ -174,7 +174,7 @@ def _format_result(item: dict, max_value_size: int) -> dict:
 
 
 def _discover_libraries() -> list[dict]:
-    """Discover all accessible libraries and return metadata with clients.
+    """Discover all accessible libraries via the mode-resolved client.
 
     Returns
     -------
@@ -184,67 +184,57 @@ def _discover_libraries() -> list[dict]:
     """
     config = load_config()
     libs: list[dict] = []
-    seen_ids: set[int] = set()
 
     try:
-        local_zot = get_client()
-        libs.append(
-            {
-                "name": "My Library",
-                "id": "0",
-                "type": "user",
-                "source": "local",
-                "client": local_zot,
-            }
-        )
-        for group in local_zot.groups():
-            seen_ids.add(group["id"])
-            try:
+        zot = get_client()
+    except Exception:  # config error, local Zotero down with no remote, etc.
+        return libs
+
+    use_web = config.has_remote_credentials and config.mode != "local"
+    source = "remote" if use_web else "local"
+
+    libs.append(
+        {
+            "name": "My Library",
+            "id": "0",
+            "type": "user",
+            "source": source,
+            "client": zot,
+        }
+    )
+
+    try:
+        groups = zot.groups()
+    except Exception as e:
+        typer.echo(f"Warning: group discovery failed: {e}", err=True)
+        return libs
+
+    for group in groups:
+        try:
+            if use_web:
+                group_zot = zotero.Zotero(
+                    library_id=str(group["id"]),
+                    library_type="group",
+                    api_key=config.api_key,
+                )
+            else:
                 group_zot = zotero.Zotero(
                     library_id=str(group["id"]),
                     library_type="group",
                     local=True,
                 )
-                libs.append(
-                    {
-                        "name": group["data"]["name"],
-                        "id": str(group["id"]),
-                        "type": "group",
-                        "source": "local",
-                        "client": group_zot,
-                    }
-                )
-            except (ConnectionError, OSError, PyZoteroError):
-                pass
-    except (ConnectionError, OSError, PyZoteroError):
-        pass
-
-    if config.has_remote_credentials:
-        try:
-            remote = zotero.Zotero(
-                library_id=config.user_id,
-                library_type="user",
-                api_key=config.api_key,
-            )
-            for group in remote.groups():
-                if group["id"] not in seen_ids:
-                    group_zot = zotero.Zotero(
-                        library_id=str(group["id"]),
-                        library_type="group",
-                        api_key=config.api_key,
-                    )
-                    libs.append(
-                        {
-                            "name": group["data"]["name"],
-                            "id": str(group["id"]),
-                            "type": "group",
-                            "source": "remote",
-                            "client": group_zot,
-                            "meta_items": group.get("meta", {}).get("numItems", "?"),
-                        }
-                    )
-        except (ConnectionError, OSError, PyZoteroError) as e:
-            typer.echo(f"Warning: remote group discovery failed: {e}", err=True)
+        except Exception:
+            continue
+        entry = {
+            "name": group["data"]["name"],
+            "id": str(group["id"]),
+            "type": "group",
+            "source": source,
+            "client": group_zot,
+        }
+        if use_web:
+            entry["meta_items"] = group.get("meta", {}).get("numItems", "?")
+        libs.append(entry)
 
     return libs
 
@@ -1005,7 +995,7 @@ def libraries() -> None:
         elif lib_info.get("client"):
             try:
                 entry["items"] = lib_info["client"].num_items()
-            except (ConnectionError, OSError, PyZoteroError):
+            except Exception:
                 entry["items"] = "?"
         else:
             entry["items"] = "?"
