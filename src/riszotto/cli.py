@@ -110,12 +110,13 @@ def _resolve_collection_key(zot: zotero.Zotero, name: str) -> str:
     if not matches:
         typer.echo(
             f"No collection matching '{name}'. Run 'riszotto collections' to see available collections.",
+            err=True,
         )
         raise typer.Exit(1)
     if len(matches) > 1:
         names = ", ".join(c["data"]["name"] for c in matches)
         typer.echo(
-            f"Ambiguous collection '{name}'. Candidates: {names}"
+            f"Ambiguous collection '{name}'. Candidates: {names}", err=True
         )
         raise typer.Exit(1)
     return matches[0]["data"]["key"]

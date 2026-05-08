@@ -2655,7 +2655,7 @@ class TestCachePopulate:
             cli_mod.app, ["cache", "populate", "--collection", "Machine"]
         )
         assert out.exit_code == 1
-        assert "Ambiguous" in out.stdout or "ambiguous" in out.stdout
+        assert "Ambiguous" in out.output or "ambiguous" in out.output
 
     def test_unknown_collection_exits_1(self, monkeypatch):
         from riszotto import cli as cli_mod
