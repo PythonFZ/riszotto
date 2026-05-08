@@ -98,9 +98,9 @@ def _collection_name(zot: zotero.Zotero) -> str:
 def _resolve_collection_key(zot: zotero.Zotero, name: str) -> str:
     """Resolve a partial collection name to its Zotero key.
 
-    Mirrors `_match_library` semantics: case-insensitive prefix/substring
-    match. Single hit wins; zero or multiple hits print candidates and
-    raise `typer.Exit(1)`.
+    Case-insensitive substring match against collection names. Single hit
+    wins; zero or multiple hits print candidates to stderr and raise
+    `typer.Exit(1)`.
     """
     needle = name.casefold()
     cols = zot.collections()
@@ -1297,7 +1297,7 @@ def _print_populate_summary(result: PopulateResult) -> None:
 
 
 def _format_elapsed(seconds: float) -> str:
-    """Format a duration like '4h 12m' or '53s'."""
+    """Format a duration like '4h 12m', '1m 30s', or '53s'."""
     seconds = int(seconds)
     if seconds < 60:
         return f"{seconds}s"
