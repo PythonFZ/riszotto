@@ -40,7 +40,7 @@ class PopulateResult:
         return sum(len(v) for v in self.failed.values())
 
     def total_processed(self) -> int:
-        return self.ok + self.skipped_count()
+        return self.ok + self.skipped_count() + self.failed_count()
 
 
 class ProgressReporter(Protocol):

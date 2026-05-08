@@ -23,7 +23,7 @@ class TestPopulateResult:
             failed={"convert_failed": ["KEY1: boom"]},
             elapsed_seconds=12.5,
         )
-        assert r.total_processed() == 14
+        assert r.total_processed() == 15
 
     def test_failed_count_sums_lists(self):
         r = PopulateResult(
