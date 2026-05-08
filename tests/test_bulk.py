@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from riszotto.bulk import PopulateResult, _NullProgress
+from riszotto.bulk import PopulateResult, _NullProgress, populate_library
+from riszotto.client import PdfNotOnStorageError, ZoteroPermissionError
 
 
 class TestPopulateResult:
@@ -43,13 +47,6 @@ class TestNullProgress:
         p.advance(label="paper-1")
         p.log("hello")
         p.finish()
-
-
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-from riszotto.bulk import populate_library
-from riszotto.client import PdfNotOnStorageError, ZoteroPermissionError
 
 
 def _item(key: str, title: str = "Title") -> dict:
