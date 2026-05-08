@@ -106,9 +106,7 @@ class TestPopulateLibrarySkips:
         assert result.failed == {}
         stub_converter.convert.assert_not_called()
 
-    def test_pdf_not_on_storage_routes_to_skipped(
-        self, monkeypatch, stub_converter
-    ):
+    def test_pdf_not_on_storage_routes_to_skipped(self, monkeypatch, stub_converter):
         monkeypatch.setattr(
             "riszotto.bulk.get_pdf_attachments",
             lambda zot, key: [_attachment(key)],

@@ -2563,9 +2563,7 @@ class TestCachePopulate:
             elapsed_seconds=42.0,
         )
         monkeypatch.setattr(cli_mod, "_get_zot", lambda library=None: self._zot())
-        monkeypatch.setattr(
-            cli_mod, "populate_library", MagicMock(return_value=result)
-        )
+        monkeypatch.setattr(cli_mod, "populate_library", MagicMock(return_value=result))
 
         from typer.testing import CliRunner
 
@@ -2585,9 +2583,7 @@ class TestCachePopulate:
             cli_mod,
             "populate_library",
             MagicMock(
-                return_value=PopulateResult(
-                    ok=0, failed={"convert_failed": ["A: x"]}
-                )
+                return_value=PopulateResult(ok=0, failed={"convert_failed": ["A: x"]})
             ),
         )
 

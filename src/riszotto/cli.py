@@ -104,9 +104,7 @@ def _resolve_collection_key(zot: zotero.Zotero, name: str) -> str:
     """
     needle = name.casefold()
     cols = zot.collections()
-    matches = [
-        c for c in cols if needle in c["data"]["name"].casefold()
-    ]
+    matches = [c for c in cols if needle in c["data"]["name"].casefold()]
     if not matches:
         typer.echo(
             f"No collection matching '{name}'. Run 'riszotto collections' to see available collections.",
@@ -115,9 +113,7 @@ def _resolve_collection_key(zot: zotero.Zotero, name: str) -> str:
         raise typer.Exit(1)
     if len(matches) > 1:
         names = ", ".join(c["data"]["name"] for c in matches)
-        typer.echo(
-            f"Ambiguous collection '{name}'. Candidates: {names}", err=True
-        )
+        typer.echo(f"Ambiguous collection '{name}'. Candidates: {names}", err=True)
         raise typer.Exit(1)
     return matches[0]["data"]["key"]
 
@@ -1215,9 +1211,7 @@ def cache_populate(
     ] = None,
     limit: Annotated[
         Optional[int],
-        typer.Option(
-            "--limit", "-n", help="Maximum number of items to process."
-        ),
+        typer.Option("--limit", "-n", help="Maximum number of items to process."),
     ] = None,
     backend: Annotated[
         Optional[str],
@@ -1228,7 +1222,8 @@ def cache_populate(
     dry_run: Annotated[
         bool,
         typer.Option(
-            "--dry-run", help="List items that would be processed; do not download or convert."
+            "--dry-run",
+            help="List items that would be processed; do not download or convert.",
         ),
     ] = False,
     no_cache: Annotated[
@@ -1292,7 +1287,10 @@ def _print_populate_summary(result: PopulateResult) -> None:
             for msg in msgs:
                 typer.echo(f"    {reason}: {msg}", err=True)
 
-    if result.ok + result.skipped_count() + result.failed_count() > 0 and not result.interrupted:
+    if (
+        result.ok + result.skipped_count() + result.failed_count() > 0
+        and not result.interrupted
+    ):
         typer.echo(
             "Re-run the same command to retry — cached items are skipped instantly."
         )

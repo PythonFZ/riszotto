@@ -76,9 +76,7 @@ class ProgressReporter(Protocol):
 class _NullProgress:
     """No-op reporter used by tests and as a default when none is supplied."""
 
-    def start(
-        self, *, total: int, library_label: str, scope_label: str | None
-    ) -> None:
+    def start(self, *, total: int, library_label: str, scope_label: str | None) -> None:
         pass
 
     def advance(self, *, label: str) -> None:
@@ -175,18 +173,14 @@ def populate_library(
                 progress.log(f"{key} skip:not_on_storage")
                 continue
             except ZoteroPermissionError:
-                result.skipped["permission"] = (
-                    result.skipped.get("permission", 0) + 1
-                )
+                result.skipped["permission"] = result.skipped.get("permission", 0) + 1
                 progress.log(f"{key} skip:permission")
                 continue
             except KeyboardInterrupt:
                 result.interrupted = True
                 break
             except Exception as e:
-                result.failed.setdefault("download_failed", []).append(
-                    f"{key}: {e}"
-                )
+                result.failed.setdefault("download_failed", []).append(f"{key}: {e}")
                 progress.log(f"{key} fail:download_failed: {e}")
                 continue
 
@@ -203,9 +197,7 @@ def populate_library(
                 # Backend extras missing -- abort the whole run.
                 raise
             except Exception as e:
-                result.failed.setdefault("convert_failed", []).append(
-                    f"{key}: {e}"
-                )
+                result.failed.setdefault("convert_failed", []).append(f"{key}: {e}")
                 progress.log(f"{key} fail:convert_failed: {e}")
                 continue
 
@@ -229,9 +221,7 @@ class _PlainProgress:
         self._total = 0
         self._n = 0
 
-    def start(
-        self, *, total: int, library_label: str, scope_label: str | None
-    ) -> None:
+    def start(self, *, total: int, library_label: str, scope_label: str | None) -> None:
         self._total = total
         scope = f", scope: {scope_label}" if scope_label else ""
         self._stream.write(
@@ -274,9 +264,7 @@ class _RichProgress:
         )
         self._task_id = None
 
-    def start(
-        self, *, total: int, library_label: str, scope_label: str | None
-    ) -> None:
+    def start(self, *, total: int, library_label: str, scope_label: str | None) -> None:
         scope = f" — {scope_label}" if scope_label else ""
         self._progress.start()
         self._task_id = self._progress.add_task(
