@@ -2542,3 +2542,133 @@ class TestCacheCommandsWithPdfCache:
         )
         assert result.exit_code == 1
         assert "no effect" in result.output or "content-keyed" in result.output
+
+
+class TestCachePopulate:
+    """riszotto cache populate"""
+
+    def _zot(self):
+        zot = MagicMock()
+        zot.collections.return_value = []
+        return zot
+
+    def test_invokes_populate_library_and_prints_summary(self, monkeypatch):
+        from riszotto import cli as cli_mod
+        from riszotto.bulk import PopulateResult
+
+        result = PopulateResult(
+            ok=2,
+            skipped={"no_pdf": 1},
+            failed={"convert_failed": ["X: boom"]},
+            elapsed_seconds=42.0,
+        )
+        monkeypatch.setattr(cli_mod, "_get_zot", lambda library=None: self._zot())
+        monkeypatch.setattr(
+            cli_mod, "populate_library", MagicMock(return_value=result)
+        )
+
+        from typer.testing import CliRunner
+
+        out = CliRunner().invoke(cli_mod.app, ["cache", "populate"])
+
+        assert out.exit_code == 0
+        assert "2 ok" in out.stdout
+        assert "1 skipped" in out.stdout
+        assert "1 failed" in out.stdout
+
+    def test_exit_code_1_when_zero_ok_and_failures(self, monkeypatch):
+        from riszotto import cli as cli_mod
+        from riszotto.bulk import PopulateResult
+
+        monkeypatch.setattr(cli_mod, "_get_zot", lambda library=None: self._zot())
+        monkeypatch.setattr(
+            cli_mod,
+            "populate_library",
+            MagicMock(
+                return_value=PopulateResult(
+                    ok=0, failed={"convert_failed": ["A: x"]}
+                )
+            ),
+        )
+
+        from typer.testing import CliRunner
+
+        out = CliRunner().invoke(cli_mod.app, ["cache", "populate"])
+        assert out.exit_code == 1
+
+    def test_exit_code_130_on_interrupt(self, monkeypatch):
+        from riszotto import cli as cli_mod
+        from riszotto.bulk import PopulateResult
+
+        monkeypatch.setattr(cli_mod, "_get_zot", lambda library=None: self._zot())
+        monkeypatch.setattr(
+            cli_mod,
+            "populate_library",
+            MagicMock(return_value=PopulateResult(ok=1, interrupted=True)),
+        )
+
+        from typer.testing import CliRunner
+
+        out = CliRunner().invoke(cli_mod.app, ["cache", "populate"])
+        assert out.exit_code == 130
+        assert "Interrupted" in out.stdout
+
+    def test_collection_resolves_to_key(self, monkeypatch):
+        from riszotto import cli as cli_mod
+        from riszotto.bulk import PopulateResult
+
+        zot = self._zot()
+        zot.collections.return_value = [
+            {"data": {"key": "COLL1", "name": "ML papers"}},
+            {"data": {"key": "COLL2", "name": "Physics"}},
+        ]
+        monkeypatch.setattr(cli_mod, "_get_zot", lambda library=None: zot)
+        captured = {}
+
+        def fake_populate(z, **kwargs):
+            captured.update(kwargs)
+            return PopulateResult(ok=1)
+
+        monkeypatch.setattr(cli_mod, "populate_library", fake_populate)
+
+        from typer.testing import CliRunner
+
+        out = CliRunner().invoke(
+            cli_mod.app, ["cache", "populate", "--collection", "ML"]
+        )
+        assert out.exit_code == 0
+        assert captured["collection_key"] == "COLL1"
+
+    def test_ambiguous_collection_exits_1(self, monkeypatch):
+        from riszotto import cli as cli_mod
+
+        zot = self._zot()
+        zot.collections.return_value = [
+            {"data": {"key": "C1", "name": "Machine Learning"}},
+            {"data": {"key": "C2", "name": "Machine Vision"}},
+        ]
+        monkeypatch.setattr(cli_mod, "_get_zot", lambda library=None: zot)
+
+        from typer.testing import CliRunner
+
+        out = CliRunner().invoke(
+            cli_mod.app, ["cache", "populate", "--collection", "Machine"]
+        )
+        assert out.exit_code == 1
+        assert "Ambiguous" in out.stdout or "ambiguous" in out.stdout
+
+    def test_unknown_collection_exits_1(self, monkeypatch):
+        from riszotto import cli as cli_mod
+
+        zot = self._zot()
+        zot.collections.return_value = [
+            {"data": {"key": "C1", "name": "Physics"}},
+        ]
+        monkeypatch.setattr(cli_mod, "_get_zot", lambda library=None: zot)
+
+        from typer.testing import CliRunner
+
+        out = CliRunner().invoke(
+            cli_mod.app, ["cache", "populate", "--collection", "Biology"]
+        )
+        assert out.exit_code == 1
