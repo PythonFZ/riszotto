@@ -368,14 +368,16 @@ class TestAllItems:
         zot = MagicMock()
         zot.collection_items_top.return_value = [
             {"key": "A", "data": {"itemType": "journalArticle"}},
+            {"key": "B", "data": {"itemType": "book"}},
+            {"key": "C", "data": {"itemType": "preprint"}},
         ]
         from riszotto.client import all_items
 
-        result = all_items(zot, collection_key="COLL", limit=5)
+        result = all_items(zot, collection_key="COLL", limit=2)
 
-        zot.collection_items_top.assert_called_once_with("COLL", limit=5, start=0)
+        zot.collection_items_top.assert_called_once_with("COLL", limit=2, start=0)
         zot.everything.assert_not_called()
-        assert [item["key"] for item in result] == ["A"]
+        assert [item["key"] for item in result] == ["A", "B"]
 
 
 class TestGetItemBibtex:

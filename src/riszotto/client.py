@@ -315,8 +315,12 @@ def all_items(
     collection_key
         If given, restrict to items in this collection (top-level only).
     limit
-        If given, cap the number of items returned. When ``None`` (default),
-        every parent item is fetched via ``zot.everything()``.
+        If given, cap the number of items returned. The cap is applied both
+        at the API layer (passed as ``limit`` to pyzotero) and again as a
+        defensive slice on the result, so the returned list is guaranteed
+        to have at most ``limit`` entries even if a future pyzotero version
+        ignores the kwarg. When ``None`` (default), every parent item is
+        fetched via ``zot.everything()``.
 
     Returns
     -------
