@@ -2,8 +2,19 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
-from typing import Protocol
+from pathlib import Path
+from typing import Any, Protocol
+
+from riszotto.client import (
+    PdfNotOnStorageError,
+    ZoteroPermissionError,
+    all_items,
+    get_pdf_attachments,
+    resolve_pdf_path,
+)
+from riszotto.converter import get_converter
 
 
 @dataclass
@@ -77,3 +88,133 @@ class _NullProgress:
 
     def finish(self) -> None:
         pass
+
+
+def _format_label(item: dict[str, Any]) -> str:
+    """Short human label for progress display: '<KEY> <Title…>'."""
+    key = item.get("key", "?")
+    title = item.get("data", {}).get("title", "") or "(untitled)"
+    if len(title) > 60:
+        title = title[:57] + "..."
+    return f"{key} {title}"
+
+
+def populate_library(
+    zot: Any,
+    *,
+    collection_key: str | None = None,
+    limit: int | None = None,
+    backend: str | None = None,
+    no_cache: bool = False,
+    dry_run: bool = False,
+    progress: ProgressReporter | None = None,
+) -> PopulateResult:
+    """Walk a library and warm both caches for every item with a PDF.
+
+    Sequential: pyzotero rate limits cap I/O parallelism and docling is heavy
+    enough that multi-process conversion risks OOM/contention. Both caches
+    short-circuit on hit, so re-runs are cheap.
+
+    Parameters
+    ----------
+    zot
+        Configured pyzotero client (already scoped to the desired library).
+    collection_key
+        If given, restrict to a single collection (top-level items only).
+    limit
+        Maximum number of items to process (after discovery).
+    backend
+        Converter backend (``"markitdown"`` / ``"docling"``); ``None`` =
+        auto-detect.
+    no_cache
+        Forwarded to ``Converter.convert``: forces re-conversion of markdown.
+        The PDF cache is unaffected (content-addressed by md5).
+    dry_run
+        Skip downloading and converting; only enumerate.
+    progress
+        Reporter used to drive a progress bar (CLI) or stay quiet (tests).
+    """
+    progress = progress or _NullProgress()
+    converter = get_converter(backend) if not dry_run else None
+
+    items = all_items(zot, collection_key=collection_key, limit=limit)
+    progress.start(
+        total=len(items),
+        library_label=getattr(zot, "library_id", "library"),
+        scope_label=collection_key,
+    )
+
+    result = PopulateResult()
+    started = time.monotonic()
+
+    try:
+        for item in items:
+            label = _format_label(item)
+            progress.advance(label=label)
+            key = item["key"]
+
+            attachments = get_pdf_attachments(zot, key)
+            if not attachments:
+                result.skipped["no_pdf"] = result.skipped.get("no_pdf", 0) + 1
+                progress.log(f"{key} skip:no_pdf")
+                continue
+
+            if dry_run:
+                result.ok += 1
+                progress.log(f"{key} dry-run pdf=Y")
+                continue
+
+            attachment = attachments[0]
+            try:
+                pdf_path = resolve_pdf_path(zot, attachment)
+            except PdfNotOnStorageError:
+                result.skipped["not_on_storage"] = (
+                    result.skipped.get("not_on_storage", 0) + 1
+                )
+                progress.log(f"{key} skip:not_on_storage")
+                continue
+            except ZoteroPermissionError:
+                result.skipped["permission"] = (
+                    result.skipped.get("permission", 0) + 1
+                )
+                progress.log(f"{key} skip:permission")
+                continue
+            except KeyboardInterrupt:
+                result.interrupted = True
+                break
+            except Exception as e:
+                result.failed.setdefault("download_failed", []).append(
+                    f"{key}: {e}"
+                )
+                progress.log(f"{key} fail:download_failed: {e}")
+                continue
+
+            try:
+                converter.convert(
+                    Path(pdf_path),
+                    zotero_key=key,
+                    no_cache=no_cache,
+                )
+            except KeyboardInterrupt:
+                result.interrupted = True
+                break
+            except ImportError:
+                # Backend extras missing -- abort the whole run.
+                raise
+            except Exception as e:
+                result.failed.setdefault("convert_failed", []).append(
+                    f"{key}: {e}"
+                )
+                progress.log(f"{key} fail:convert_failed: {e}")
+                continue
+
+            result.ok += 1
+            progress.log(f"{key} ok")
+
+    except KeyboardInterrupt:
+        result.interrupted = True
+    finally:
+        result.elapsed_seconds = time.monotonic() - started
+        progress.finish()
+
+    return result
