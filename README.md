@@ -63,6 +63,26 @@ riszotto recent
 # Build semantic search index (per library)
 riszotto index
 riszotto index -L "My Group"
+
+# Bulk-populate the cache
+
+Download every PDF and convert each to markdown for an entire library.
+Re-runs are idempotent: cached items are skipped instantly.
+
+```bash
+# Whole library
+riszotto cache populate --library "potentialsciences"
+
+# Just one collection, limited to the first 50 items (useful for testing)
+riszotto cache populate --library "potentialsciences" \
+    --collection "ML papers" --limit 50
+
+# Dry-run: list items that would be processed
+riszotto cache populate --dry-run
+```
+
+The command prints a progress bar to stderr and an end-of-run summary
+to stdout. Per-item failures are logged but do not abort the run.
 ```
 
 ## Group Libraries
