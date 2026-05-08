@@ -300,6 +300,43 @@ def recent_items(
     )
 
 
+def all_items(
+    zot: zotero.Zotero,
+    *,
+    collection_key: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """Return all parent (top-level) items in the library or a collection.
+
+    Parameters
+    ----------
+    zot
+        Configured pyzotero client.
+    collection_key
+        If given, restrict to items in this collection (top-level only).
+    limit
+        If given, cap the number of items returned. When ``None`` (default),
+        every parent item is fetched via ``zot.everything()``.
+
+    Returns
+    -------
+    list of dict
+        Parent (top-level) Zotero items. Child items (attachments, notes)
+        are not returned because the underlying ``top`` / ``collection_items_top``
+        endpoints already filter to parents.
+    """
+    if limit is None:
+        if collection_key is not None:
+            query = zot.collection_items_top(collection_key)
+        else:
+            query = zot.top()
+        return zot.everything(query)
+
+    if collection_key is not None:
+        return zot.collection_items_top(collection_key, limit=limit, start=0)[:limit]
+    return zot.top(limit=limit, start=0)[:limit]
+
+
 def get_item_bibtex(
     zot: zotero.Zotero, key: str, *, exclude: set[str] | None = None
 ) -> str:

@@ -321,6 +321,63 @@ class TestRecentItems:
         )
 
 
+class TestAllItems:
+    def test_returns_parent_items_via_everything_when_no_limit(self):
+        zot = MagicMock()
+        zot.top.return_value = "TOP_QUERY"
+        zot.everything.return_value = [
+            {"key": "A", "data": {"itemType": "journalArticle"}},
+            {"key": "B", "data": {"itemType": "book"}},
+        ]
+        from riszotto.client import all_items
+
+        result = all_items(zot)
+
+        zot.top.assert_called_once_with()
+        zot.everything.assert_called_once_with("TOP_QUERY")
+        assert [item["key"] for item in result] == ["A", "B"]
+
+    def test_uses_collection_items_top_when_collection_key_given(self):
+        zot = MagicMock()
+        zot.collection_items_top.return_value = "COLL_QUERY"
+        zot.everything.return_value = [{"key": "X", "data": {"itemType": "preprint"}}]
+        from riszotto.client import all_items
+
+        result = all_items(zot, collection_key="COLL123")
+
+        zot.collection_items_top.assert_called_once_with("COLL123")
+        zot.everything.assert_called_once_with("COLL_QUERY")
+        assert [item["key"] for item in result] == ["X"]
+
+    def test_paginates_manually_when_limit_set(self):
+        zot = MagicMock()
+        zot.top.return_value = [
+            {"key": "A", "data": {"itemType": "journalArticle"}},
+            {"key": "B", "data": {"itemType": "book"}},
+            {"key": "C", "data": {"itemType": "preprint"}},
+        ]
+        from riszotto.client import all_items
+
+        result = all_items(zot, limit=2)
+
+        zot.top.assert_called_once_with(limit=2, start=0)
+        zot.everything.assert_not_called()
+        assert [item["key"] for item in result] == ["A", "B"]
+
+    def test_limit_with_collection(self):
+        zot = MagicMock()
+        zot.collection_items_top.return_value = [
+            {"key": "A", "data": {"itemType": "journalArticle"}},
+        ]
+        from riszotto.client import all_items
+
+        result = all_items(zot, collection_key="COLL", limit=5)
+
+        zot.collection_items_top.assert_called_once_with("COLL", limit=5, start=0)
+        zot.everything.assert_not_called()
+        assert [item["key"] for item in result] == ["A"]
+
+
 class TestGetItemBibtex:
     def test_decodes_bytes(self):
         mock_zot = MagicMock()
