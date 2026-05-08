@@ -242,3 +242,43 @@ class TestPopulateLibraryProgress:
         prog.start.assert_called_once()
         assert prog.advance.call_count == 2
         prog.finish.assert_called_once()
+
+
+class TestMakeCliProgress:
+    def test_returns_rich_progress_when_tty(self, monkeypatch):
+        from riszotto.bulk import _RichProgress, make_cli_progress
+
+        class Stream:
+            def isatty(self):
+                return True
+
+        prog = make_cli_progress(stream=Stream())
+        assert isinstance(prog, _RichProgress)
+
+    def test_returns_plain_progress_when_not_tty(self):
+        from riszotto.bulk import _PlainProgress, make_cli_progress
+
+        class Stream:
+            def isatty(self):
+                return False
+
+        prog = make_cli_progress(stream=Stream())
+        assert isinstance(prog, _PlainProgress)
+
+
+class TestPlainProgress:
+    def test_log_writes_to_stream(self):
+        from io import StringIO
+
+        from riszotto.bulk import _PlainProgress
+
+        buf = StringIO()
+        p = _PlainProgress(stream=buf)
+        p.start(total=2, library_label="lib", scope_label=None)
+        p.advance(label="A")
+        p.log("A ok")
+        p.finish()
+
+        text = buf.getvalue()
+        assert "[1/2]" in text
+        assert "A ok" in text

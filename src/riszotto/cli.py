@@ -10,7 +10,7 @@ from typing import Annotated, Optional
 import typer
 from pyzotero import zotero
 
-from riszotto.bulk import PopulateResult, populate_library
+from riszotto.bulk import PopulateResult, make_cli_progress, populate_library
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
     AmbiguousLibraryError,
@@ -1246,6 +1246,7 @@ def cache_populate(
     if collection is not None:
         collection_key = _resolve_collection_key(zot, collection)
 
+    progress = make_cli_progress()
     try:
         result = populate_library(
             zot,
@@ -1254,6 +1255,7 @@ def cache_populate(
             backend=backend,
             no_cache=no_cache,
             dry_run=dry_run,
+            progress=progress,
         )
     except ImportError as e:
         typer.echo(str(e), err=True)
