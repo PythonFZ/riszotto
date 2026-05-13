@@ -72,10 +72,10 @@ Re-runs are idempotent: cached items are skipped instantly.
 
 ```bash
 # Whole library
-riszotto cache populate --library "potentialsciences"
+riszotto cache populate --library "<my-lib>"
 
 # Just one collection, limited to the first 50 items (useful for testing)
-riszotto cache populate --library "potentialsciences" \
+riszotto cache populate --library "<my-lib>" \
     --collection "ML papers" --limit 50
 
 # Dry-run: list items that would be processed
