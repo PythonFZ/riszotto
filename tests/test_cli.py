@@ -640,6 +640,72 @@ class TestShow:
 
     @patch("riszotto.cli.get_converter")
     @patch("riszotto.cli.get_client")
+    def test_show_last_page_omits_next_hint(self, mock_get_client, mock_get_converter):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="\n".join(f"Line {i}" for i in range(1, 11))
+        )
+        mock_get_converter.return_value = mock_converter
+
+        result = runner.invoke(
+            app, ["show", "--page", "2", "--page-size", "5", "PARENT1"]
+        )
+        assert result.exit_code == 0
+        assert "Page 2/2" in result.output
+        assert "Next:" not in result.output
+        assert "--page 3" not in result.output
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
+    def test_show_non_last_page_includes_next_hint(
+        self, mock_get_client, mock_get_converter
+    ):
+        from riszotto.converter.base import ConversionResult
+
+        mock_zot = MagicMock()
+        mock_get_client.return_value = mock_zot
+        mock_zot.children.return_value = [
+            {
+                "data": {
+                    "key": "ATT1",
+                    "itemType": "attachment",
+                    "contentType": "application/pdf",
+                    "filename": "paper.pdf",
+                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
+            }
+        ]
+        mock_converter = MagicMock()
+        mock_converter.convert.return_value = ConversionResult(
+            markdown="\n".join(f"Line {i}" for i in range(1, 11))
+        )
+        mock_get_converter.return_value = mock_converter
+
+        result = runner.invoke(
+            app, ["show", "--page", "1", "--page-size", "5", "PARENT1"]
+        )
+        assert result.exit_code == 0
+        assert "Page 1/2" in result.output
+        assert "Next:" in result.output
+        assert "--page 2" in result.output
+
+    @patch("riszotto.cli.get_converter")
+    @patch("riszotto.cli.get_client")
     def test_show_page_zero_dumps_all(self, mock_get_client, mock_get_converter):
         from riszotto.converter.base import ConversionResult
 

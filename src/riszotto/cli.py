@@ -787,10 +787,13 @@ def _show_paginated(
     typer.echo("\n".join(lines[start:end]))
 
     if total_pages > 1:
-        lib_flag = f' --library "{library}"' if library else ""
-        typer.echo(
-            f"\nPage {page}/{total_pages}. Next: riszotto show{lib_flag} --page {page + 1} {key}"
-        )
+        if page < total_pages:
+            lib_flag = f' --library "{library}"' if library else ""
+            typer.echo(
+                f"\nPage {page}/{total_pages}. Next: riszotto show{lib_flag} --page {page + 1} {key}"
+            )
+        else:
+            typer.echo(f"\nPage {page}/{total_pages}.")
 
 
 def _grep_lines(markdown: str, terms: list[str], context: int = 3) -> str | None:
