@@ -9,6 +9,11 @@
   content-addressed cache (`~/.cache/riszotto/pdfs/{md5}.pdf`).
 - `cache show` reports the new PDF cache. `cache clear` clears it; new
   `--only conversions|pdfs` flag for selective clearing.
+- `riszotto cache populate` — bulk download + convert every PDF in a library.
+  Reuses the existing PDF and markdown caches so re-runs are idempotent.
+  Supports `--library`, `--collection`, `--limit`, `--backend`, `--dry-run`,
+  and `--no-cache`. Continues past per-item failures and prints a summary
+  at the end.
 
 ### Changed (breaking)
 - Environment variables are renamed to use the `RISZOTTO_` prefix:

@@ -10,6 +10,7 @@ from typing import Annotated, Optional
 import typer
 from pyzotero import zotero
 
+from riszotto.bulk import PopulateResult, make_cli_progress, populate_library
 from riszotto.client import (
     DEFAULT_BIBTEX_EXCLUDE,
     AmbiguousLibraryError,
@@ -92,6 +93,29 @@ def _collection_name(zot: zotero.Zotero) -> str:
     if zot.library_type in ("user", "users"):
         return "user_0"
     return f"group_{zot.library_id}"
+
+
+def _resolve_collection_key(zot: zotero.Zotero, name: str) -> str:
+    """Resolve a partial collection name to its Zotero key.
+
+    Case-insensitive substring match against collection names. Single hit
+    wins; zero or multiple hits print candidates to stderr and raise
+    `typer.Exit(1)`.
+    """
+    needle = name.casefold()
+    cols = zot.collections()
+    matches = [c for c in cols if needle in c["data"]["name"].casefold()]
+    if not matches:
+        typer.echo(
+            f"No collection matching '{name}'. Run 'riszotto collections' to see available collections.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    if len(matches) > 1:
+        names = ", ".join(c["data"]["name"] for c in matches)
+        typer.echo(f"Ambiguous collection '{name}'. Candidates: {names}", err=True)
+        raise typer.Exit(1)
+    return matches[0]["data"]["key"]
 
 
 def _strip_diacritics(text: str) -> str:
@@ -1174,3 +1198,110 @@ def cache_clear(
         else:
             pdf_cleared = clear_pdf_cache()
             typer.echo(f"Cleared {pdf_cleared} file(s) from PDF cache.")
+
+
+@cache_app.command("populate")
+def cache_populate(
+    library: LibraryOption = None,
+    collection: Annotated[
+        Optional[str],
+        typer.Option(
+            "--collection", "-c", help="Restrict to a single Zotero collection."
+        ),
+    ] = None,
+    limit: Annotated[
+        Optional[int],
+        typer.Option("--limit", "-n", help="Maximum number of items to process."),
+    ] = None,
+    backend: Annotated[
+        Optional[str],
+        typer.Option(
+            "--backend", help="Converter backend ('markitdown' or 'docling')."
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="List items that would be processed; do not download or convert.",
+        ),
+    ] = False,
+    no_cache: Annotated[
+        bool,
+        typer.Option(
+            "--no-cache",
+            help="Force re-conversion of markdown (PDF cache stays a hit).",
+        ),
+    ] = False,
+) -> None:
+    """Download and convert every PDF in a library, warming both caches."""
+    zot = _get_zot(library=library)
+
+    collection_key: str | None = None
+    if collection is not None:
+        collection_key = _resolve_collection_key(zot, collection)
+
+    progress = make_cli_progress()
+    try:
+        result = populate_library(
+            zot,
+            collection_key=collection_key,
+            limit=limit,
+            backend=backend,
+            no_cache=no_cache,
+            dry_run=dry_run,
+            progress=progress,
+        )
+    except ImportError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1)
+
+    _print_populate_summary(result)
+
+    if result.interrupted:
+        raise typer.Exit(130)
+    if result.ok == 0 and result.failed_count() > 0:
+        raise typer.Exit(1)
+
+
+def _print_populate_summary(result: PopulateResult) -> None:
+    """Print the end-of-run summary to stdout."""
+    if result.interrupted:
+        typer.echo(f"Interrupted at {result.total_processed()} items processed.")
+
+    elapsed = _format_elapsed(result.elapsed_seconds)
+    typer.echo(
+        f"Done. {result.ok} ok, {result.skipped_count()} skipped, "
+        f"{result.failed_count()} failed in {elapsed}."
+    )
+
+    if result.skipped:
+        parts = ", ".join(f"{n} {reason}" for reason, n in result.skipped.items())
+        typer.echo(f"  skipped: {parts}")
+    if result.failed:
+        parts = ", ".join(
+            f"{len(msgs)} {reason}" for reason, msgs in result.failed.items()
+        )
+        typer.echo(f"  failed:  {parts}")
+        for reason, msgs in result.failed.items():
+            for msg in msgs:
+                typer.echo(f"    {reason}: {msg}", err=True)
+
+    if (
+        result.ok + result.skipped_count() + result.failed_count() > 0
+        and not result.interrupted
+    ):
+        typer.echo(
+            "Re-run the same command to retry — cached items are skipped instantly."
+        )
+
+
+def _format_elapsed(seconds: float) -> str:
+    """Format a duration like '4h 12m', '1m 30s', or '53s'."""
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}m {seconds % 60}s"
+    h, rem = divmod(seconds, 3600)
+    return f"{h}h {rem // 60}m"
