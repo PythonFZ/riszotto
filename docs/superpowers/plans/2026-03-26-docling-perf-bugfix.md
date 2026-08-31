@@ -235,8 +235,19 @@ class TestNullGuards:
     @patch("riszotto.converter.docling.compute_pdf_hash", return_value="aabb")
     @patch("riszotto.converter.docling.DocumentConverter", create=True)
     def test_picture_get_image_none(
-        self, mock_dc, mock_hash, mock_read, mock_write,
-        _pfo, _ifmt, _ad, _ao, _tfm, _tso, _tppo, tmp_path,
+        self,
+        mock_dc,
+        mock_hash,
+        mock_read,
+        mock_write,
+        _pfo,
+        _ifmt,
+        _ad,
+        _ao,
+        _tfm,
+        _tso,
+        _tppo,
+        tmp_path,
     ):
         pdf = tmp_path / "paper.pdf"
         pdf.write_bytes(b"fake pdf")
@@ -250,6 +261,7 @@ class TestNullGuards:
         mock_dc.return_value.convert.return_value.document = mock_doc
 
         from riszotto.converter.docling import DoclingConverter
+
         converter = DoclingConverter()
         result = converter.convert(pdf, zotero_key="K1")
 
@@ -272,8 +284,19 @@ class TestNullGuards:
     @patch("riszotto.converter.docling.compute_pdf_hash", return_value="aabb")
     @patch("riszotto.converter.docling.DocumentConverter", create=True)
     def test_table_image_get_image_none_falls_back_to_inline(
-        self, mock_dc, mock_hash, mock_read, mock_write,
-        _pfo, _ifmt, _ad, _ao, _tfm, _tso, _tppo, tmp_path,
+        self,
+        mock_dc,
+        mock_hash,
+        mock_read,
+        mock_write,
+        _pfo,
+        _ifmt,
+        _ad,
+        _ao,
+        _tfm,
+        _tso,
+        _tppo,
+        tmp_path,
     ):
         import pandas as pd
 
@@ -292,6 +315,7 @@ class TestNullGuards:
         mock_dc.return_value.convert.return_value.document = mock_doc
 
         from riszotto.converter.docling import DoclingConverter
+
         converter = DoclingConverter()
         result = converter.convert(pdf, zotero_key="K1", table_style="image")
 
@@ -314,8 +338,19 @@ class TestNullGuards:
     @patch("riszotto.converter.docling.compute_pdf_hash", return_value="aabb")
     @patch("riszotto.converter.docling.DocumentConverter", create=True)
     def test_formula_image_get_image_none_with_text_falls_back_to_latex(
-        self, mock_dc, mock_hash, mock_read, mock_write,
-        _pfo, _ifmt, _ad, _ao, _tfm, _tso, _tppo, tmp_path,
+        self,
+        mock_dc,
+        mock_hash,
+        mock_read,
+        mock_write,
+        _pfo,
+        _ifmt,
+        _ad,
+        _ao,
+        _tfm,
+        _tso,
+        _tppo,
+        tmp_path,
     ):
         pdf = tmp_path / "paper.pdf"
         pdf.write_bytes(b"fake pdf")
@@ -330,6 +365,7 @@ class TestNullGuards:
         mock_dc.return_value.convert.return_value.document = mock_doc
 
         from riszotto.converter.docling import DoclingConverter
+
         converter = DoclingConverter()
         result = converter.convert(pdf, zotero_key="K1", equation_mode="image")
 
@@ -427,10 +463,7 @@ class DoclingConverter:
             if cached is not None:
                 return cached
 
-        needs_page_images = (
-            table_style == "image"
-            or equation_mode == "image"
-        )
+        needs_page_images = table_style == "image" or equation_mode == "image"
 
         print("Converting PDF with docling...", file=sys.stderr)
 
@@ -510,9 +543,7 @@ class DoclingConverter:
                     elif element.text:
                         parts.append(f"$${element.text}$$")
                     else:
-                        parts.append(
-                            f"[Equation {equation_count}: not available]"
-                        )
+                        parts.append(f"[Equation {equation_count}: not available]")
 
             elif isinstance(element, TextItem):
                 parts.append(element.text)
@@ -728,18 +759,22 @@ Expected: FAIL
 In `src/riszotto/cli.py`, add these parameters to the `show` function signature (after `figure`):
 
 ```python
-    ocr: Annotated[
-        bool,
-        typer.Option("--ocr", help="Enable OCR for scanned PDFs (off by default)"),
-    ] = False,
-    table_mode: Annotated[
-        str,
-        typer.Option("--table-mode", help="Table extraction: fast or accurate (docling only)"),
-    ] = "fast",
-    equations: Annotated[
-        str,
-        typer.Option("--equations", help="Equation rendering: image or latex (docling only)"),
-    ] = "image",
+ocr: Annotated[
+    bool,
+    typer.Option("--ocr", help="Enable OCR for scanned PDFs (off by default)"),
+] = (False,)
+table_mode: Annotated[
+    str,
+    typer.Option(
+        "--table-mode", help="Table extraction: fast or accurate (docling only)"
+    ),
+] = ("fast",)
+equations: Annotated[
+    str,
+    typer.Option(
+        "--equations", help="Equation rendering: image or latex (docling only)"
+    ),
+] = ("image",)
 ```
 
 Add validation after the existing `equation_style` validation:
