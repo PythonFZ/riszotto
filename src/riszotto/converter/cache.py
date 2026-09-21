@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -98,7 +98,7 @@ def write_cache(
             shutil.copy2(src, dest)
 
     meta = CacheMeta(
-        created=datetime.now(timezone.utc),
+        created=datetime.now(UTC),
         backend=backend,
         table_style=table_style,
         equation_style=equation_style,
@@ -134,7 +134,7 @@ def clear_cache(
             meta_files = list(key_dir.rglob("meta.json"))
             if meta_files:
                 meta = CacheMeta.model_validate_json(meta_files[0].read_text())
-                age_days = (datetime.now(timezone.utc) - meta.created).days
+                age_days = (datetime.now(UTC) - meta.created).days
                 if age_days < older_than_days:
                     continue
         shutil.rmtree(key_dir)
