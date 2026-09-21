@@ -1,15 +1,14 @@
 # tests/test_converter_cache.py
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
-
 
 from riszotto.converter.cache import (
     CacheMeta,
+    clear_cache,
     compute_pdf_hash,
+    get_cache_stats,
     read_cache,
     write_cache,
-    clear_cache,
-    get_cache_stats,
 )
 
 
@@ -39,7 +38,7 @@ class TestComputePdfHash:
 class TestCacheMeta:
     def test_roundtrip_json(self):
         meta = CacheMeta(
-            created=datetime(2026, 3, 26, tzinfo=timezone.utc),
+            created=datetime(2026, 3, 26, tzinfo=UTC),
             backend="docling",
             table_style="inline",
             equation_style="inline",
