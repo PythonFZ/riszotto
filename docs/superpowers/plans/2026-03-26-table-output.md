@@ -182,7 +182,11 @@ def format_items_table(results: list[dict], *, semantic: bool = False) -> str:
     if semantic:
         col_title -= COL_SCORE
 
-    header_parts = [f"{'KEY':<{COL_KEY}}", f"{'DATE':<{COL_DATE}}", f"{'AUTHORS':<{COL_AUTHORS}}"]
+    header_parts = [
+        f"{'KEY':<{COL_KEY}}",
+        f"{'DATE':<{COL_DATE}}",
+        f"{'AUTHORS':<{COL_AUTHORS}}",
+    ]
     if semantic:
         header_parts.append(f"{'SCORE':<{COL_SCORE}}")
     header_parts.append("TITLE")
@@ -345,7 +349,11 @@ In `src/riszotto/cli.py`:
 
 1. Update the import from `formatting` (line 28):
 ```python
-from riszotto.formatting import format_creator, format_items_table, format_collections_table
+from riszotto.formatting import (
+    format_creator,
+    format_items_table,
+    format_collections_table,
+)
 ```
 
 2. Add `FormatOption` after `LibraryOption` (after line 39):
@@ -382,7 +390,9 @@ else:
     output = format_items_table(envelope["results"])
     typer.echo(output)
     if envelope["results"] and len(envelope["results"]) == limit:
-        typer.echo(f"\nPage {page}. Next: riszotto search {' '.join(terms)} --page {page + 1}")
+        typer.echo(
+            f"\nPage {page}. Next: riszotto search {' '.join(terms)} --page {page + 1}"
+        )
 ```
 
 For `_search_all_libraries` (line 314):
@@ -423,6 +433,7 @@ def test_search_no_results_table_output(self, mock_get_client):
     assert result.exit_code == 0
     assert "No results found." in result.output
 
+
 @patch("riszotto.cli.get_client")
 def test_search_default_table_output(self, mock_get_client):
     mock_zot = MagicMock()
@@ -434,7 +445,13 @@ def test_search_default_table_output(self, mock_get_client):
                 "title": "Attention Is All You Need",
                 "itemType": "journalArticle",
                 "date": "2017-06-12",
-                "creators": [{"firstName": "Ashish", "lastName": "Vaswani", "creatorType": "author"}],
+                "creators": [
+                    {
+                        "firstName": "Ashish",
+                        "lastName": "Vaswani",
+                        "creatorType": "author",
+                    }
+                ],
                 "abstractNote": "",
                 "tags": [],
             },
@@ -449,6 +466,7 @@ def test_search_default_table_output(self, mock_get_client):
     assert "Vaswani, Ashish" in result.output
     # Verify it's NOT json
     import json
+
     with pytest.raises(json.JSONDecodeError):
         json.loads(result.output)
 ```
