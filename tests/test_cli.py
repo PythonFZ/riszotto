@@ -1,7 +1,7 @@
 import json
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from riszotto.cli import app
