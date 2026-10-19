@@ -56,11 +56,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+
 @dataclass
 class ConversionResult:
     """Internal result object -- dataclass, not serialized to disk."""
-    markdown: str                    # full markdown with image refs injected
-    figures: dict[str, Path] = field(default_factory=dict)  # {"figure_1.png": Path(...)}
+
+    markdown: str  # full markdown with image refs injected
+    figures: dict[str, Path] = field(
+        default_factory=dict
+    )  # {"figure_1.png": Path(...)}
+
 
 class Converter(Protocol):
     def convert(
@@ -126,7 +131,9 @@ pipeline_options = PdfPipelineOptions()
 pipeline_options.generate_picture_images = True
 pipeline_options.images_scale = 2.0
 pipeline_options.do_table_structure = True
-pipeline_options.do_formula_enrichment = True  # off by default in docling, enabled explicitly
+pipeline_options.do_formula_enrichment = (
+    True  # off by default in docling, enabled explicitly
+)
 
 converter = DocumentConverter(
     format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)}
@@ -146,6 +153,7 @@ try:
     from docling.datamodel.pipeline_options import PdfPipelineOptions
     from docling.datamodel.base_models import InputFormat
     from docling_core.types.doc import PictureItem, TableItem, FormulaItem
+
     DOCLING_AVAILABLE = True
 except ImportError:
     DOCLING_AVAILABLE = False
@@ -172,14 +180,18 @@ All riszotto paths move to platform-appropriate locations via `platformdirs`:
 from pathlib import Path
 from platformdirs import user_config_dir, user_data_dir, user_cache_dir
 
+
 def config_dir() -> Path:
     return Path(user_config_dir("riszotto"))
+
 
 def data_dir() -> Path:
     return Path(user_data_dir("riszotto"))
 
+
 def cache_dir() -> Path:
     return Path(user_cache_dir("riszotto"))
+
 
 CONFIG_PATH = config_dir() / "config.toml"
 CHROMA_DIR = data_dir() / "chroma_db"
@@ -193,6 +205,7 @@ On startup (in `paths.py`), check if `~/.riszotto/` exists and differs from the 
 ```python
 LEGACY_DIR = Path.home() / ".riszotto"
 
+
 def check_legacy_migration() -> None:
     """Warn if legacy ~/.riszotto/ exists and differs from platformdirs paths."""
     if not LEGACY_DIR.exists():
@@ -203,16 +216,14 @@ def check_legacy_migration() -> None:
     legacy_config = LEGACY_DIR / "config.toml"
     if legacy_config.exists() and not CONFIG_PATH.exists():
         typer.echo(
-            f"Found legacy config at {legacy_config}. "
-            f"Please move it to {CONFIG_PATH}",
+            f"Found legacy config at {legacy_config}. Please move it to {CONFIG_PATH}",
             err=True,
         )
     # Check for chroma_db
     legacy_chroma = LEGACY_DIR / "chroma_db"
     if legacy_chroma.exists() and not CHROMA_DIR.exists():
         typer.echo(
-            f"Found legacy index at {legacy_chroma}. "
-            f"Please move it to {CHROMA_DIR}",
+            f"Found legacy index at {legacy_chroma}. Please move it to {CHROMA_DIR}",
             err=True,
         )
 ```
@@ -255,6 +266,7 @@ Uses `CONVERSION_CACHE_DIR` from `paths.py` (i.e., `platformdirs.user_cache_dir(
 ```python
 from pydantic import BaseModel
 from datetime import datetime
+
 
 class CacheMeta(BaseModel):
     created: datetime
