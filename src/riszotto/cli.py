@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import unicodedata
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from pyzotero import zotero
@@ -28,16 +28,15 @@ from riszotto.config import load_config
 from riszotto.converter import get_converter
 from riszotto.converter.cache import clear_cache, get_cache_stats
 from riszotto.formatting import (
+    format_collections_table,
     format_creator,
     format_items_table,
-    format_collections_table,
 )
-
 
 app = typer.Typer(add_completion=False)
 
 LibraryOption = Annotated[
-    Optional[str],
+    str | None,
     typer.Option(
         "--library",
         "-L",
@@ -369,28 +368,28 @@ def search(
         ),
     ] = 200,
     tag: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option("--tag", "-t", help="Filter by tag (repeatable, AND logic)"),
     ] = None,
     item_type: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--item-type", help="Filter by item type (e.g. journalArticle, book)"
         ),
     ] = None,
     since: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--since", help="Only items modified after this date"),
     ] = None,
     sort: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--sort", help="Sort field (e.g. dateModified, title, creator)"),
     ] = None,
     direction: Annotated[
-        Optional[str], typer.Option("--direction", help="Sort direction (asc or desc)")
+        str | None, typer.Option("--direction", help="Sort direction (asc or desc)")
     ] = None,
     author: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--author",
             help="Filter by author name (diacritic-insensitive substring match)",
@@ -554,7 +553,7 @@ def show(
     ] = 1,
     page_size: Annotated[int, typer.Option("--page-size", help="Lines per page")] = 500,
     search: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--search", "-s", help="Show only lines matching all terms"),
     ] = None,
     context: Annotated[
@@ -563,7 +562,7 @@ def show(
     ] = 3,
     library: LibraryOption = None,
     backend: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--backend", help="Converter backend (markitdown or docling)"),
     ] = None,
     table_style: Annotated[
@@ -584,7 +583,7 @@ def show(
         typer.Option("--no-cache", help="Force re-processing (skip cache)"),
     ] = False,
     figure: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--figure", help="Display path to cached figure N (1-indexed)"),
     ] = None,
     ocr: Annotated[
@@ -725,7 +724,7 @@ def export(
         str, typer.Option("--format", "-f", help="Export format")
     ] = "bibtex",
     exclude: Annotated[
-        Optional[list[str]],
+        list[str] | None,
         typer.Option("--exclude", "-e", help="BibTeX fields to exclude (repeatable)"),
     ] = None,
     include_all: Annotated[
@@ -838,7 +837,7 @@ def _format_collection(col: dict) -> dict:
 @app.command()
 def collections(
     key: Annotated[
-        Optional[str], typer.Argument(help="Collection key (omit to list all)")
+        str | None, typer.Argument(help="Collection key (omit to list all)")
     ] = None,
     limit: Annotated[
         int, typer.Option("--limit", "-l", help="Maximum number of results")
@@ -936,7 +935,7 @@ def index(
         bool, typer.Option("--status", help="Show index statistics")
     ] = False,
     limit: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--limit", "-l", help="Maximum items to fetch from Zotero"),
     ] = None,
     library: LibraryOption = None,
@@ -1031,7 +1030,7 @@ def libraries() -> None:
     lines = [header, "-" * len(header)]
     for lib in libs:
         lines.append(
-            f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {str(lib['items']):<8} {str(lib['indexed']):<8} {lib['source']}"
+            f"{lib['name']:<30} {lib['id']:<10} {lib['type']:<8} {lib['items']!s:<8} {lib['indexed']!s:<8} {lib['source']}"
         )
     typer.echo("\n".join(lines))
 
@@ -1054,7 +1053,7 @@ def _format_bytes(n: int) -> str:
 @cache_app.command("show")
 def cache_show(
     key: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--key", "-k", help="Show cache for a specific paper"),
     ] = None,
 ) -> None:
@@ -1083,11 +1082,11 @@ def _parse_duration(s: str) -> int | None:
 @cache_app.command("clear")
 def cache_clear(
     key: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--key", "-k", help="Clear cache for a specific paper"),
     ] = None,
     older_than: Annotated[
-        Optional[str],
+        str | None,
         typer.Option(
             "--older-than", help="Clear entries older than duration (e.g., 30d)"
         ),

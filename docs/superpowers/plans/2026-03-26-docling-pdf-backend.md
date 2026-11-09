@@ -178,7 +178,9 @@ class TestLegacyMigration:
         new_chroma = tmp_path / "new_data" / "chroma_db"
         with (
             patch("riszotto.paths.LEGACY_DIR", legacy),
-            patch("riszotto.paths.CONFIG_PATH", tmp_path / "new_config" / "config.toml"),
+            patch(
+                "riszotto.paths.CONFIG_PATH", tmp_path / "new_config" / "config.toml"
+            ),
             patch("riszotto.paths.CHROMA_DIR", new_chroma),
             patch("riszotto.paths.config_dir", return_value=tmp_path / "new_config"),
         ):
@@ -256,16 +258,14 @@ def check_legacy_migration() -> None:
     legacy_config = LEGACY_DIR / "config.toml"
     if legacy_config.exists() and not CONFIG_PATH.exists():
         print(
-            f"Found legacy config at {legacy_config}. "
-            f"Please move it to {CONFIG_PATH}",
+            f"Found legacy config at {legacy_config}. Please move it to {CONFIG_PATH}",
             file=sys.stderr,
         )
 
     legacy_chroma = LEGACY_DIR / "chroma_db"
     if legacy_chroma.exists() and not CHROMA_DIR.exists():
         print(
-            f"Found legacy index at {legacy_chroma}. "
-            f"Please move it to {CHROMA_DIR}",
+            f"Found legacy index at {legacy_chroma}. Please move it to {CHROMA_DIR}",
             file=sys.stderr,
         )
 ```
@@ -843,14 +843,22 @@ class TestClearCache:
     def test_clear_all(self, tmp_path):
         with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
             write_cache(
-                zotero_key="K1", pdf_hash="h1h1h1h1h1h1",
-                markdown="a", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K1",
+                pdf_hash="h1h1h1h1h1h1",
+                markdown="a",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             write_cache(
-                zotero_key="K2", pdf_hash="h2h2h2h2h2h2",
-                markdown="b", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K2",
+                pdf_hash="h2h2h2h2h2h2",
+                markdown="b",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             cleared = clear_cache()
             assert cleared == 2
@@ -860,14 +868,22 @@ class TestClearCache:
     def test_clear_by_key(self, tmp_path):
         with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
             write_cache(
-                zotero_key="K1", pdf_hash="h1h1h1h1h1h1",
-                markdown="a", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K1",
+                pdf_hash="h1h1h1h1h1h1",
+                markdown="a",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             write_cache(
-                zotero_key="K2", pdf_hash="h2h2h2h2h2h2",
-                markdown="b", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K2",
+                pdf_hash="h2h2h2h2h2h2",
+                markdown="b",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             cleared = clear_cache(key="K1")
             assert cleared == 1
@@ -891,9 +907,13 @@ class TestGetCacheStats:
     def test_populated_cache(self, tmp_path):
         with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
             write_cache(
-                zotero_key="K1", pdf_hash="h1h1h1h1h1h1",
-                markdown="content here", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K1",
+                pdf_hash="h1h1h1h1h1h1",
+                markdown="content here",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             stats = get_cache_stats()
             assert stats["paper_count"] == 1
@@ -902,9 +922,13 @@ class TestGetCacheStats:
     def test_stats_for_specific_key(self, tmp_path):
         with patch("riszotto.converter.cache.CONVERSION_CACHE_DIR", tmp_path):
             write_cache(
-                zotero_key="K1", pdf_hash="h1h1h1h1h1h1",
-                markdown="a", figures={},
-                backend="docling", table_style="inline", equation_style="inline",
+                zotero_key="K1",
+                pdf_hash="h1h1h1h1h1h1",
+                markdown="a",
+                figures={},
+                backend="docling",
+                table_style="inline",
+                equation_style="inline",
             )
             stats = get_cache_stats(key="K1")
             assert stats["paper_count"] == 1
@@ -1130,7 +1154,9 @@ import pytest
 class TestDoclingAvailableFlag:
     def test_import_error_sets_flag_false(self):
         # Force reimport with docling missing
-        with patch.dict(sys.modules, {"docling": None, "docling.document_converter": None}):
+        with patch.dict(
+            sys.modules, {"docling": None, "docling.document_converter": None}
+        ):
             # Can't easily reimport, so test the converter init behavior
             from riszotto.converter.docling import DOCLING_AVAILABLE
 
@@ -1509,9 +1535,7 @@ class TestShowConverterIntegration:
                     "contentType": "application/pdf",
                     "filename": "paper.pdf",
                 },
-                "links": {
-                    "enclosure": {"href": "file:///path/to/paper.pdf"}
-                },
+                "links": {"enclosure": {"href": "file:///path/to/paper.pdf"}},
             }
         ]
         from riszotto.converter.base import ConversionResult
@@ -1690,11 +1714,16 @@ def show(
     ] = None,
     table_style: Annotated[
         str,
-        typer.Option("--table-style", help="Table rendering: inline or image (docling only)"),
+        typer.Option(
+            "--table-style", help="Table rendering: inline or image (docling only)"
+        ),
     ] = "inline",
     equation_style: Annotated[
         str,
-        typer.Option("--equation-style", help="Equation rendering: inline or image (docling only)"),
+        typer.Option(
+            "--equation-style",
+            help="Equation rendering: inline or image (docling only)",
+        ),
     ] = "inline",
     no_cache: Annotated[
         bool,
@@ -1707,10 +1736,15 @@ def show(
 ) -> None:
     """Convert a paper's PDF attachment to markdown."""
     if table_style not in ("inline", "image"):
-        typer.echo(f"Invalid --table-style: {table_style}. Use 'inline' or 'image'.", err=True)
+        typer.echo(
+            f"Invalid --table-style: {table_style}. Use 'inline' or 'image'.", err=True
+        )
         raise typer.Exit(1)
     if equation_style not in ("inline", "image"):
-        typer.echo(f"Invalid --equation-style: {equation_style}. Use 'inline' or 'image'.", err=True)
+        typer.echo(
+            f"Invalid --equation-style: {equation_style}. Use 'inline' or 'image'.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     zot = _get_zot(library=library)
@@ -1832,6 +1866,7 @@ mock_md.convert.return_value = mock_result
 to:
 ```python
 from riszotto.converter.base import ConversionResult
+
 mock_converter = MagicMock()
 mock_converter.convert.return_value = ConversionResult(markdown="...")
 mock_get_converter.return_value = mock_converter
@@ -1984,7 +2019,9 @@ def cache_clear(
     ] = None,
     older_than: Annotated[
         Optional[str],
-        typer.Option("--older-than", help="Clear entries older than duration (e.g., 30d)"),
+        typer.Option(
+            "--older-than", help="Clear entries older than duration (e.g., 30d)"
+        ),
     ] = None,
 ) -> None:
     """Clear cached conversions."""
