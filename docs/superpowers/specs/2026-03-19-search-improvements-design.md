@@ -92,10 +92,13 @@ The `--author` filter currently does case-insensitive substring matching. The ne
 ```python
 import unicodedata
 
+
 def _normalize(text: str) -> str:
     """Strip diacritics and lowercase for comparison."""
     nfkd = unicodedata.normalize("NFKD", text)
-    return "".join(c for c in nfkd if not unicodedata.category(c).startswith("M")).lower()
+    return "".join(
+        c for c in nfkd if not unicodedata.category(c).startswith("M")
+    ).lower()
 ```
 
 This means `--author "bogdau"` matches "Magdău", `--author "schafer"` matches "Schäfer". No new dependencies.
