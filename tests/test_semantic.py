@@ -3,12 +3,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from riszotto.semantic import (
+    INDEX_DIR,
     _build_document_text,
     _get_collection,
     build_index,
     get_index_status,
     semantic_search,
-    INDEX_DIR,
 )
 
 
